@@ -1,0 +1,26 @@
+{
+  "name": "quorum",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Quorum — multi-persona roundtable deliberation engine",
+  "scripts": {
+    "dev": "pnpm --parallel --filter \"./apps/*\" dev",
+    "dev:web": "pnpm --filter @quorum/web dev",
+    "dev:orchestrator": "pnpm --filter @quorum/orchestrator dev",
+    "build": "pnpm -r build",
+    "db:generate": "pnpm --filter @quorum/db generate",
+    "db:push": "pnpm --filter @quorum/db push",
+    "db:seed": "pnpm --filter @quorum/db seed",
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "tsx": "^4.16.2",
+    "@types/node": "^20.14.12"
+  },
+  "packageManager": "pnpm@9.6.0",
+  "engines": {
+    "node": ">=20"
+  }
+}

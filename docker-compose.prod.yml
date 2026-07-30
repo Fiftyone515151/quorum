@@ -1,0 +1,75 @@
+# Full production stack on a single server:
+#   web + worker + postgres + redis, plus a one-shot migrate/seed.
+# Bring it all up with:
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# API keys come from .env (QWEN_API_KEY / DEEPSEEK_API_KEY). DATABASE_URL and
+# REDIS_URL are overridden below to point at the in-network service names.
+
+x-app-env: &app-env
+  DATABASE_URL: postgresql://quorum:quorum@postgres:5432/quorum
+  REDIS_URL: redis://redis:6379
+  NODE_ENV: production
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: quorum
+      POSTGRES_PASSWORD: quorum
+      POSTGRES_DB: quorum
+    volumes:
+      - quorum-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quorum"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/orchestrator/Dockerfile
+    command: sh -c "pnpm --filter @quorum/db exec prisma db push --skip-generate && pnpm --filter @quorum/db exec tsx prisma/seed.ts"
+    env_file: .env
+    environment: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/orchestrator/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment: *app-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment: *app-env
+    ports:
+      - "3000:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+
+volumes:
+  quorum-pgdata:

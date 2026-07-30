@@ -1,0 +1,27 @@
+{
+  "name": "@quorum/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "generate": "prisma generate",
+    "push": "dotenv -e ../../.env -- prisma db push",
+    "migrate": "dotenv -e ../../.env -- prisma migrate dev",
+    "seed": "dotenv -e ../../.env -- tsx prisma/seed.ts",
+    "studio": "dotenv -e ../../.env -- prisma studio"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.18.0",
+    "@quorum/engine": "workspace:*"
+  },
+  "devDependencies": {
+    "dotenv-cli": "^7.4.2",
+    "prisma": "^5.18.0",
+    "tsx": "^4.16.2"
+  }
+}

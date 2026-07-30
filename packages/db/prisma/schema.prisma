@@ -1,0 +1,130 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Auth (email + password, custom JWT) ----------
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  password  String // bcrypt hash
+  name      String?
+  companies Company[]
+  personas  Persona[]
+  createdAt DateTime  @default(now())
+}
+
+// ---------- Quorum VC domain ----------
+enum Stage {
+  pre_seed
+  seed
+  A
+}
+
+enum Mode {
+  screening
+  ic
+  board
+  tea
+}
+
+enum RunStatus {
+  pending
+  running
+  awaiting_founder
+  done
+  failed
+}
+
+/// A user's persistent startup profile — editable, BP can be pre-uploaded/updated.
+model Company {
+  id              String    @id @default(cuid())
+  ownerId         String
+  owner           User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name            String
+  bp              String    @db.Text
+  fundingCurrency String?
+  valuation       String?
+  roundSize       String?
+  stage           Stage     @default(seed)
+  topic           String?
+  runs            ModeRun[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model ModeRun {
+  id        String    @id @default(cuid())
+  companyId String
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  /// snapshot of the company fields at run time (so old runs show that version)
+  companySnapshot Json
+  mode      Mode
+  status    RunStatus @default(pending)
+  stage     Stage
+  inheritedFromId String?
+  inheritedFrom   ModeRun?  @relation("RunInheritance", fields: [inheritedFromId], references: [id])
+  children        ModeRun[] @relation("RunInheritance")
+
+  roles         RunRole[]
+  turns         Turn[]
+  founderInputs FounderInput[]
+  result        Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model RunRole {
+  id        String  @id @default(cuid())
+  runId     String
+  run       ModeRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  personaId String
+  persona   Persona @relation(fields: [personaId], references: [id])
+  order     Int
+
+  @@unique([runId, personaId])
+}
+
+model Turn {
+  id        String   @id @default(cuid())
+  runId     String
+  run       ModeRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  seq       Int
+  actor     String
+  segment   String
+  content   String   @db.Text
+  fields    Json?
+  createdAt DateTime @default(now())
+
+  @@index([runId, seq])
+}
+
+model Persona {
+  id                 String    @id @default(cuid())
+  name               String
+  avatar             String?
+  seatId             String
+  skinId             String
+  dimensionsOverride String[]  @default([])
+  riskAxesOverride   String[]  @default([])
+  isPreset           Boolean   @default(false)
+  ownerId            String?
+  owner              User?     @relation(fields: [ownerId], references: [id])
+  seats              RunRole[]
+  createdAt          DateTime  @default(now())
+}
+
+model FounderInput {
+  id        String   @id @default(cuid())
+  runId     String
+  run       ModeRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  kind      String
+  refId     String?
+  payload   Json
+  createdAt DateTime @default(now())
+}
