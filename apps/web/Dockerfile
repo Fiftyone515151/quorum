@@ -14,4 +14,5 @@ RUN pnpm --filter @quorum/db generate
 RUN pnpm --filter @quorum/web build
 
 EXPOSE 3000
-CMD ["pnpm", "--filter", "@quorum/web", "start"]
+# On start: sync schema + seed presets (both idempotent), then serve.
+CMD sh -c "pnpm --filter @quorum/db exec prisma db push --skip-generate && pnpm --filter @quorum/db exec tsx prisma/seed.ts && pnpm --filter @quorum/web start"
