@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 const DIM_LABEL: Record<string, string> = {
@@ -25,6 +26,7 @@ const MODE_LABEL: Record<string, string> = { screening: "Screening", ic: "Invest
 
 export default function RunPage({ params }: { params: { id: string } }) {
   const { id } = params;
+  const router = useRouter();
   const [run, setRun] = useState<RunData | null>(null);
   const [feed, setFeed] = useState<Feed[]>([]);
   const [result, setResult] = useState<any>(null);
@@ -35,6 +37,12 @@ export default function RunPage({ params }: { params: { id: string } }) {
 
   async function sendFounder(body: any) {
     await fetch(`/api/runs/${id}/message`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  }
+
+  async function deleteRun() {
+    if (!confirm("Delete this session? This can't be undone.")) return;
+    await fetch(`/api/runs/${id}`, { method: "DELETE" });
+    router.push("/");
   }
 
   function nameMap(r: RunData | null): Record<string, { name: string; avatar?: string }> {
@@ -139,7 +147,8 @@ export default function RunPage({ params }: { params: { id: string } }) {
       {(status === "done" || status === "failed") && (
         <div className="flex items-center gap-3 border-t border-line pt-4">
           <span className="label text-accent">✓ Result saved</span>
-          <Link href="/" className="btn-primary ml-auto">Save &amp; back to home</Link>
+          <button onClick={deleteRun} className="btn-ghost ml-auto text-muted hover:text-brass">Delete session</button>
+          <Link href="/" className="btn-primary">Save &amp; back to home</Link>
         </div>
       )}
     </div>

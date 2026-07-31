@@ -68,7 +68,7 @@ model ModeRun {
   status    RunStatus @default(pending)
   stage     Stage
   inheritedFromId String?
-  inheritedFrom   ModeRun?  @relation("RunInheritance", fields: [inheritedFromId], references: [id])
+  inheritedFrom   ModeRun?  @relation("RunInheritance", fields: [inheritedFromId], references: [id], onDelete: SetNull)
   children        ModeRun[] @relation("RunInheritance")
 
   roles         RunRole[]
