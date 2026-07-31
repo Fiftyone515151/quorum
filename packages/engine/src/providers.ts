@@ -129,9 +129,26 @@ export async function generateChat(opts: GenOptions): Promise<string> {
 function extractJson(raw: string): unknown {
   const cleaned = raw.replace(/```json/gi, "").replace(/```/g, "").trim();
   const start = cleaned.indexOf("{");
-  const end = cleaned.lastIndexOf("}");
-  if (start === -1 || end === -1) throw new Error(`no JSON object found in: ${cleaned.slice(0, 200)}`);
-  return JSON.parse(cleaned.slice(start, end + 1));
+  if (start === -1) throw new Error(`no JSON object found in: ${cleaned.slice(0, 200)}`);
+  // Scan from the first "{" for its matching "}", so any prose or extra objects
+  // the model appends after a complete JSON object are ignored (models sometimes
+  // emit trailing explanations, which broke a naive lastIndexOf("}") slice).
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = start; i < cleaned.length; i++) {
+    const ch = cleaned[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === "{") depth++;
+    else if (ch === "}" && --depth === 0) return JSON.parse(cleaned.slice(start, i + 1));
+  }
+  throw new Error(`unbalanced JSON object in: ${cleaned.slice(0, 200)}`);
 }
 
 export interface StructuredOptions<T> {

@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 const schema = z.object({
   name: z.string().min(1),
   bp: z.string().min(1),
+  bpFileName: z.string().optional(),
   fundingCurrency: z.string().optional(),
   valuation: z.string().optional(),
   roundSize: z.string().optional(),

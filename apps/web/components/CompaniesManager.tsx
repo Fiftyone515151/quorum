@@ -1,15 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 interface Company {
-  id: string; name: string; bp: string; stage: string;
+  id: string; name: string; bp: string; bpFileName?: string | null; stage: string;
   fundingCurrency?: string | null; valuation?: string | null; roundSize?: string | null; topic?: string | null;
 }
 const STAGES = ["pre_seed", "seed", "A"];
-const blank = { name: "", bp: "", stage: "seed", fundingCurrency: "USD", valuation: "", roundSize: "", topic: "" };
+const blank = { name: "", bp: "", bpFileName: "", stage: "seed", fundingCurrency: "USD", valuation: "", roundSize: "", topic: "" };
 
 export default function CompaniesManager({ initial }: { initial: Company[] }) {
+  const router = useRouter();
   const [companies, setCompanies] = useState<Company[]>(initial);
   const [editing, setEditing] = useState<string | "new" | null>(initial.length === 0 ? "new" : null);
   const [form, setForm] = useState<any>(blank);
@@ -26,7 +28,7 @@ export default function CompaniesManager({ initial }: { initial: Company[] }) {
     const fd = new FormData(); fd.append("file", file);
     const res = await fetch("/api/upload", { method: "POST", body: fd });
     const d = await res.json();
-    if (res.ok) setForm((f: any) => ({ ...f, bp: d.content, name: f.name || d.name.replace(/\.[^.]+$/, "") }));
+    if (res.ok) setForm((f: any) => ({ ...f, bp: d.content, bpFileName: file.name, name: f.name || d.name.replace(/\.[^.]+$/, "") }));
     else setError(d.error ?? "Upload failed");
   }
 
@@ -45,6 +47,7 @@ export default function CompaniesManager({ initial }: { initial: Company[] }) {
       if (!res.ok) throw new Error(typeof d.error === "string" ? d.error : "Save failed");
       setCompanies((cs) => isNew ? [d.company, ...cs] : cs.map((c) => (c.id === d.company.id ? d.company : c)));
       setEditing(null);
+      router.refresh(); // re-render server home so the mode cards enable immediately
     } catch (e: any) { setError(e.message); } finally { setBusy(false); }
   }
 
@@ -52,6 +55,7 @@ export default function CompaniesManager({ initial }: { initial: Company[] }) {
     if (!confirm("Delete this startup and its runs?")) return;
     await fetch(`/api/companies/${id}`, { method: "DELETE" });
     setCompanies((cs) => cs.filter((c) => c.id !== id));
+    router.refresh();
   }
 
   return (
@@ -68,7 +72,6 @@ export default function CompaniesManager({ initial }: { initial: Company[] }) {
           <div key={c.id} className="card flex items-center gap-3 p-4">
             <span className="text-sm font-medium text-white">{c.name}</span>
             <span className="label">{c.stage}</span>
-            <span className="label text-muted">{c.bp.length} chars BP</span>
             <button onClick={() => startEdit(c)} className="btn-ghost ml-auto">Edit</button>
             <button onClick={() => remove(c.id)} className="text-muted hover:text-brass">✕</button>
           </div>
@@ -88,9 +91,20 @@ function Editor({ form, setForm, onSave, onCancel, onUpload, busy, error, isNew 
     <div className="card flex flex-col gap-3 p-4">
       <p className="label">{isNew ? "New startup" : "Edit startup"}</p>
       <input value={form.name} onChange={set("name")} placeholder="Startup name" className="rounded-lg border border-line bg-ink p-3 text-sm text-white outline-none focus:border-accent" />
-      <textarea value={form.bp} onChange={set("bp")} placeholder="BP (paste, or upload — any language)" className="min-h-[110px] rounded-lg border border-line bg-ink p-3 text-sm text-white outline-none focus:border-accent" />
-      <label className="btn-ghost cursor-pointer self-start">Upload / update BP
+      <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-line bg-ink p-3 text-sm hover:border-accent">
         <input type="file" accept=".pdf,.docx,.txt,.md" className="hidden" onChange={(e) => e.target.files?.[0] && onUpload(e.target.files[0])} />
+        {form.bpFileName || form.bp ? (
+          <>
+            <span className="text-accent">📄</span>
+            <span className="truncate text-white">{form.bpFileName || "BP on file"}</span>
+            <span className="label text-muted ml-auto shrink-0">Replace</span>
+          </>
+        ) : (
+          <>
+            <span className="text-muted">Upload BP</span>
+            <span className="label text-muted ml-auto shrink-0">.pdf .docx .txt .md</span>
+          </>
+        )}
       </label>
       <div className="flex flex-wrap gap-2">
         <select value={form.stage} onChange={set("stage")} className="rounded-lg border border-line bg-ink p-2 text-sm text-white">

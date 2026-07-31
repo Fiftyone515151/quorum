@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 const patchSchema = z.object({
   name: z.string().min(1).optional(),
   bp: z.string().min(1).optional(),
+  bpFileName: z.string().optional(),
   fundingCurrency: z.string().optional(),
   valuation: z.string().optional(),
   roundSize: z.string().optional(),
