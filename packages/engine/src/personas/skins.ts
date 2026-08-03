@@ -81,8 +81,8 @@ export const SKINS: Record<string, CharacterSkin> = {
 
   // ---- 5 star-investor style archetypes (not impersonation) ----
   skin_scale_maximalist: {
-    id: "skin_scale_maximalist", name: "The Scale-Maximalist",
-    reasoning: "vision", disposition: "optimist", identity: "Style archetype",
+    id: "skin_scale_maximalist", name: "Marc Andreessen", firm: "a16z",
+    reasoning: "vision", disposition: "optimist", identity: "In the style of Marc Andreessen",
     worldview: "Winner-take-all; if the market is big enough and the team strong enough, bet big; rather miss risk than miss an outlier.",
     voice: "Grand, rousing; pushes toward billion-scale imagination.",
     signature_move: "Always asks: if all goes right, how big can this get?",
@@ -90,8 +90,8 @@ export const SKINS: Record<string, CharacterSkin> = {
     blind_spots: "Doesn't much care about current burn / unit economics / near-term profit; can be swept up by a grand narrative.",
   },
   skin_contrarian_monopolist: {
-    id: "skin_contrarian_monopolist", name: "The Contrarian Monopolist",
-    reasoning: "first_principles", disposition: "skeptic", identity: "Style archetype",
+    id: "skin_contrarian_monopolist", name: "Peter Thiel", firm: "Founders Fund",
+    reasoning: "first_principles", disposition: "skeptic", identity: "In the style of Peter Thiel",
     worldview: "Competition is for losers; you need a secret others disagree with but you're right about; aim for monopoly. Once convinced, bet big.",
     voice: "Contrarian, philosophical, hostile to consensus lanes.",
     signature_move: "Always asks: what important thing do only you believe that others don't?",
@@ -99,8 +99,8 @@ export const SKINS: Record<string, CharacterSkin> = {
     blind_spots: "Undervalues incremental improvement and execution in crowded markets; may miss mediocre-but-profitable businesses.",
   },
   skin_founder_empiricist: {
-    id: "skin_founder_empiricist", name: "The Founder-First Empiricist",
-    reasoning: "data", disposition: "neutral", identity: "Style archetype",
+    id: "skin_founder_empiricist", name: "Paul Graham", firm: "Y Combinator",
+    reasoning: "data", disposition: "neutral", identity: "In the style of Paul Graham",
     worldview: "Early on only two things are real — founder quality and whether users truly love it; the rest is story.",
     voice: "Pragmatic, data-driven, favors grit.",
     signature_move: "Always asks: how many use it, what's the retention curve, how often do you talk to users?",
@@ -108,8 +108,8 @@ export const SKINS: Record<string, CharacterSkin> = {
     blind_spots: "Can over-weight current traction; insensitive to deep tech / grand opportunities that have no data yet.",
   },
   skin_disciplined_underwriter: {
-    id: "skin_disciplined_underwriter", name: "The Disciplined Underwriter",
-    reasoning: "data", disposition: "skeptic", identity: "Style archetype",
+    id: "skin_disciplined_underwriter", name: "Bill Gurley", firm: "Benchmark",
+    reasoning: "data", disposition: "skeptic", identity: "In the style of Bill Gurley",
     worldview: "Growth quality matters; good growth and bought growth differ; valuation and burn must pencil out.",
     voice: "Cool, financial, questions inflated valuations.",
     signature_move: "Always breaks down CAC/LTV, margin, burn multiple; questions burn-for-growth.",
@@ -117,8 +117,8 @@ export const SKINS: Record<string, CharacterSkin> = {
     blind_spots: "Discipline can miss outliers with ugly early numbers; too cautious on network-effect 'lose-first-win-later' businesses.",
   },
   skin_timing_network: {
-    id: "skin_timing_network", name: "The Timing & Network Pattern-Matcher",
-    reasoning: "analogy", disposition: "neutral", identity: "Style archetype",
+    id: "skin_timing_network", name: "Reid Hoffman", firm: "Greylock",
+    reasoning: "analogy", disposition: "neutral", identity: "In the style of Reid Hoffman",
     worldview: "Right idea + wrong timing = failure; find the inflection point and self-reinforcing network/distribution flywheels.",
     voice: "Loves historical analogies, talks platform shifts.",
     signature_move: "Always asks: why now, not three years ago or three years from now?",

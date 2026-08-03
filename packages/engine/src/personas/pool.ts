@@ -18,11 +18,11 @@ export const DEFAULT_POOL: Persona[] = [
 
 /** 5 star-investor style archetypes (Persona Spec §6) — broad-spectrum, own tag overrides. */
 export const STAR_POOL: Persona[] = [
-  { id: "scale_maximalist", name: "The Scale-Maximalist", seatId: "seat_generalist", skinId: "skin_scale_maximalist", avatar: "🚀", dimensionsOverride: ["market", "traction"], riskAxesOverride: ["growth", "market"] },
-  { id: "contrarian_monopolist", name: "The Contrarian Monopolist", seatId: "seat_generalist", skinId: "skin_contrarian_monopolist", avatar: "♟️", dimensionsOverride: ["moat", "market"], riskAxesOverride: ["product", "market"] },
-  { id: "founder_empiricist", name: "The Founder-First Empiricist", seatId: "seat_generalist", skinId: "skin_founder_empiricist", avatar: "🌱", dimensionsOverride: ["team", "traction"], riskAxesOverride: ["team", "growth"] },
-  { id: "disciplined_underwriter", name: "The Disciplined Underwriter", seatId: "seat_generalist", skinId: "skin_disciplined_underwriter", avatar: "📉", dimensionsOverride: ["business_model", "traction"], riskAxesOverride: ["capital", "market"] },
-  { id: "timing_network", name: "The Timing & Network Pattern-Matcher", seatId: "seat_generalist", skinId: "skin_timing_network", avatar: "🕰️", dimensionsOverride: ["market", "moat"], riskAxesOverride: ["market", "growth"] },
+  { id: "scale_maximalist", name: "Marc Andreessen", seatId: "seat_generalist", skinId: "skin_scale_maximalist", avatar: "🚀", dimensionsOverride: ["market", "traction"], riskAxesOverride: ["growth", "market"] },
+  { id: "contrarian_monopolist", name: "Peter Thiel", seatId: "seat_generalist", skinId: "skin_contrarian_monopolist", avatar: "♟️", dimensionsOverride: ["moat", "market"], riskAxesOverride: ["product", "market"] },
+  { id: "founder_empiricist", name: "Paul Graham", seatId: "seat_generalist", skinId: "skin_founder_empiricist", avatar: "🌱", dimensionsOverride: ["team", "traction"], riskAxesOverride: ["team", "growth"] },
+  { id: "disciplined_underwriter", name: "Bill Gurley", seatId: "seat_generalist", skinId: "skin_disciplined_underwriter", avatar: "📉", dimensionsOverride: ["business_model", "traction"], riskAxesOverride: ["capital", "market"] },
+  { id: "timing_network", name: "Reid Hoffman", seatId: "seat_generalist", skinId: "skin_timing_network", avatar: "🕰️", dimensionsOverride: ["market", "moat"], riskAxesOverride: ["market", "growth"] },
 ];
 
 export const ALL_PERSONAS: Persona[] = [...DEFAULT_POOL, ...STAR_POOL];

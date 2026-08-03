@@ -15,6 +15,7 @@ function dto(p: (typeof DEFAULT_POOL)[number], isStar: boolean) {
     reasoning: r.skin.reasoning,
     identity: r.skin.identity,
     signature: r.skin.signature_move,
+    firm: r.skin.firm ?? null,
     isStar,
   };
 }

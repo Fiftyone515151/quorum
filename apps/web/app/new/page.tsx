@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 interface PersonaDTO {
   id: string; name: string; avatar?: string; seat: string;
-  dimensions: string[]; stance: string; reasoning: string; identity: string | null; isStar: boolean;
+  dimensions: string[]; stance: string; reasoning: string; identity: string | null; firm: string | null; isStar: boolean;
 }
 interface Company { id: string; name: string; stage: string }
 type Mode = "screening" | "ic" | "board" | "tea";
@@ -66,6 +66,7 @@ function NewSessionInner() {
       className={`card p-3 text-left transition ${selected.includes(p.id) ? "border-accent ring-1 ring-accent" : "hover:border-muted"}`}>
       <div className="flex items-center gap-2 text-white"><span>{p.avatar ?? "🧠"}</span><span className="text-sm font-medium">{p.name}</span>
         <span className={`label ml-auto ${p.stance === "skeptic" ? "text-brass" : p.stance === "optimist" ? "text-accent" : ""}`}>{p.stance}</span></div>
+      {p.firm && <div className="mt-0.5 text-xs italic text-muted">In the style of · {p.firm}</div>}
       <div className="mt-1 text-xs text-muted">{p.seat} · {p.dimensions.join("/") || "generalist"}</div>
     </button>
   );
