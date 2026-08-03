@@ -39,6 +39,9 @@ export interface CharacterSkin {
   // optional overrides for star archetypes (broad-spectrum investors)
   methodology?: string;
   blind_spots?: string;
+  /** For star personas modeled on a real investor: their firm. Its presence marks
+   *  the persona as an "in the style of {name}" archetype (drives UI + prompt framing). */
+  firm?: string;
 }
 
 export interface Persona {

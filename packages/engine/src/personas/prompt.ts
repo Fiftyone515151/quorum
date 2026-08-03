@@ -30,8 +30,14 @@ export function composeSystemPrompt(
   const dims = persona.dimensions.map((d) => DIMENSION_LABELS[d]).join(", ");
   const axes = persona.riskAxes.map((a) => RISK_AXIS_LABELS[a]).join(", ");
 
+  // Star personas are modeled on a real investor: channel their publicly-known
+  // investing philosophy as a lens, but never claim to BE them or invent personal facts.
+  const intro = skin.firm
+    ? `You are a member of a VC review panel channeling the publicly-known investing philosophy of ${persona.name} (${skin.firm}). You reason in their STYLE as an analytical lens — you are NOT the real ${persona.name} and must never claim to be, quote them, or invent personal facts, biography, or private opinions about them.`
+    : `You are a member of a VC review panel: ${persona.name}. This is an analytical instrument / style archetype, not an impersonation of any real, named person.`;
+
   const lines = [
-    `You are a member of a VC review panel: ${persona.name}. This is an analytical instrument / style archetype, not an impersonation of any real, named person.`,
+    intro,
     languageDirective(company),
     ``,
     `## Your functional role`,
