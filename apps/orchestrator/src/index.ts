@@ -8,20 +8,24 @@ import { prisma, RunStatus } from "@quorum/db";
 import {
   runMode,
   resolvePersona,
+  JOBS_QUEUE,
+  parseJob,
+  drainListAtomic,
   type RunContext,
   type RunEvent,
   type Persona,
   type Dimension,
   type RiskAxis,
 } from "@quorum/engine";
-import { JOBS_CHANNEL, eventsChannel, inboxKey } from "./keys.js";
+import { eventsChannel, inboxKey } from "./keys.js";
 
 const REDIS_URL = process.env.REDIS_URL ?? "redis://localhost:6379";
-const sub = new Redis(REDIS_URL);
+const queueConn = new Redis(REDIS_URL); // dedicated blocking connection for BRPOP
 const cmd = new Redis(REDIS_URL);
-sub.on("error", (e) => console.error("[redis:sub]", e.message));
+queueConn.on("error", (e) => console.error("[redis:queue]", e.message));
 cmd.on("error", (e) => console.error("[redis:cmd]", e.message));
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const running = new Set<string>();
 
 function toStatus(s: string): RunStatus {
@@ -130,15 +134,20 @@ async function handleRun(runId: string): Promise<void> {
           blocker.quit().catch(() => {});
         }
       },
-      // Non-blocking founder interjections (Founder Tea).
+      // Non-blocking founder interjections (Founder Tea). Read + clear in one
+      // atomic transaction so a concurrent push can't be lost.
       drainInterjections: async () => {
-        const items = await cmd.lrange(inboxKey(runId), 0, -1);
-        if (items.length) await cmd.del(inboxKey(runId));
+        const items = await drainListAtomic(cmd, inboxKey(runId));
         return items.map((s) => { try { return JSON.parse(s); } catch { return { content: s }; } });
       },
     });
   } catch (e) {
     console.error(`[orchestrator] run ${runId} failed`, e);
+    // Don't leave the run wedged in "running": mark it failed and tell the UI.
+    await prisma.modeRun.update({ where: { id: runId }, data: { status: RunStatus.failed } }).catch(() => {});
+    await cmd
+      .publish(eventsChannel(runId), JSON.stringify({ type: "run.failed", error: String((e as Error)?.message ?? e) }))
+      .catch(() => {});
   } finally {
     running.delete(runId);
     console.log(`[orchestrator] finished run ${runId}`);
@@ -146,16 +155,19 @@ async function handleRun(runId: string): Promise<void> {
 }
 
 async function main() {
-  await sub.subscribe(JOBS_CHANNEL);
-  sub.on("message", (_ch, message) => {
+  console.log(`[orchestrator] listening on ${JOBS_QUEUE} (redis: ${REDIS_URL})`);
+  // Durable queue: BRPOP blocks until a job is available. Jobs LPUSH'd while the
+  // worker was down are still here on reconnect (unlike pub/sub, which drops them).
+  while (true) {
     try {
-      const { runId } = JSON.parse(message);
-      if (runId) void handleRun(runId);
+      const res = await queueConn.brpop(JOBS_QUEUE, 0); // [key, value] | null
+      const job = parseJob(res?.[1]);
+      if (job) void handleRun(job.runId);
     } catch (e) {
-      console.error("[orchestrator] bad job message", e);
+      console.error("[orchestrator] queue error", (e as Error).message);
+      await sleep(1000); // avoid a hot loop if the connection is flapping
     }
-  });
-  console.log(`[orchestrator] listening on ${JOBS_CHANNEL} (redis: ${REDIS_URL})`);
+  }
 }
 
 main().catch((e) => {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma, Mode } from "@quorum/db";
+import { MIN_PANELISTS, MAX_PANELISTS, findDuplicates } from "@quorum/engine";
 import { getSession } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -8,7 +9,15 @@ export const dynamic = "force-dynamic";
 const bodySchema = z.object({
   companyId: z.string(),
   mode: z.enum(["screening", "ic", "board", "tea"]),
-  participants: z.array(z.string()).min(2).max(6),
+  participants: z
+    .array(z.string())
+    .min(MIN_PANELISTS)
+    .max(MAX_PANELISTS)
+    // Reject duplicate personas up front — otherwise the RunRole @@unique
+    // constraint throws a 500 at insert time.
+    .refine((ids) => findDuplicates(ids).length === 0, {
+      message: "Duplicate panelists are not allowed.",
+    }),
   inheritedFromId: z.string().optional(),
 });
 

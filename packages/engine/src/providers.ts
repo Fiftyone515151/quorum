@@ -1,4 +1,5 @@
 import type { ProviderName } from "./types.js";
+import { inactivityTimeout, LLM_IDLE_TIMEOUT_MS } from "./timeout.js";
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
@@ -61,6 +62,9 @@ export async function* streamChat(opts: GenOptions): AsyncGenerator<string, void
   let lastErr: unknown;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    // Abort the request if no bytes arrive for LLM_IDLE_TIMEOUT_MS, so a hung
+    // provider can't wedge the run forever. Chained to the caller's signal.
+    const timer = inactivityTimeout(LLM_IDLE_TIMEOUT_MS, opts.signal);
     try {
       const res = await fetch(`${baseUrl}/chat/completions`, {
         method: "POST",
@@ -75,7 +79,7 @@ export async function* streamChat(opts: GenOptions): AsyncGenerator<string, void
           max_tokens: opts.maxTokens ?? 1500,
           stream: true,
         }),
-        signal: opts.signal,
+        signal: timer.signal,
       });
 
       if (!res.ok || !res.body) {
@@ -89,6 +93,7 @@ export async function* streamChat(opts: GenOptions): AsyncGenerator<string, void
 
       while (true) {
         const { done, value } = await reader.read();
+        timer.touch(); // progress made — reset the idle clock
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
@@ -109,9 +114,16 @@ export async function* streamChat(opts: GenOptions): AsyncGenerator<string, void
       }
       return;
     } catch (err) {
-      lastErr = err;
-      if ((err as any)?.name === "AbortError") throw err;
+      // Idle-timeout aborts are retryable; a caller-initiated abort is not.
+      if (timer.timedOut()) {
+        lastErr = new Error(`${opts.provider}/${opts.model} timed out after ${LLM_IDLE_TIMEOUT_MS}ms of inactivity`);
+      } else {
+        lastErr = err;
+        if ((err as any)?.name === "AbortError") throw err;
+      }
       if (attempt < maxAttempts) await sleep(600 * attempt);
+    } finally {
+      timer.clear();
     }
   }
   throw new Error(

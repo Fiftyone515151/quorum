@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getSession } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -6,6 +7,9 @@ export const dynamic = "force-dynamic";
 const MAX_BYTES = 15 * 1024 * 1024; // 15 MB
 
 export async function POST(req: NextRequest) {
+  // Require a session — file parsing is CPU-heavy and shouldn't be open to anonymous callers.
+  if (!(await getSession())) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
   const form = await req.formData();
   const file = form.get("file");
   if (!(file instanceof File)) {

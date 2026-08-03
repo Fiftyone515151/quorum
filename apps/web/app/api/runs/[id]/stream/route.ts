@@ -1,10 +1,20 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@quorum/db";
 import { makeSubscriber } from "@/lib/redis";
 import { eventsChannel } from "@/lib/keys";
+import { getSession } from "@/lib/auth";
+import { authorizeRun } from "@/lib/authorize";
 
 export const dynamic = "force-dynamic";
 
+const findRun = (id: string) =>
+  prisma.modeRun.findUnique({ where: { id }, include: { company: { select: { ownerId: true } } } });
+
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+  // Data isolation: only the run's owner may subscribe to its live transcript.
+  const authz = await authorizeRun(await getSession(), params.id, findRun);
+  if (!authz.ok) return NextResponse.json({ error: authz.error }, { status: authz.status });
+
   const channel = eventsChannel(params.id);
   const sub = makeSubscriber();
   const encoder = new TextEncoder();

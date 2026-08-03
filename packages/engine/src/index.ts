@@ -1,5 +1,8 @@
 export * from "./types.js";
 export * from "./events.js";
+export * from "./queue.js";
+export * from "./timeout.js";
+export * from "./vc/participants.js";
 
 // personas
 export {

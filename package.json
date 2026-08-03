@@ -11,12 +11,14 @@
     "db:generate": "pnpm --filter @quorum/db generate",
     "db:push": "pnpm --filter @quorum/db push",
     "db:seed": "pnpm --filter @quorum/db seed",
+    "test": "vitest run",
     "infra:up": "docker compose up -d",
     "infra:down": "docker compose down"
   },
   "devDependencies": {
     "typescript": "^5.5.4",
     "tsx": "^4.16.2",
+    "vitest": "^2.1.9",
     "@types/node": "^20.14.12"
   },
   "packageManager": "pnpm@9.6.0",
