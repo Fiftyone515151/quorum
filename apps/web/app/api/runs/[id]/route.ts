@@ -25,6 +25,12 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
     prisma.modeRun.findUnique({ where: { id }, include: { company: { select: { ownerId: true } } } })
   );
   if (!authz.ok) return NextResponse.json({ error: authz.error }, { status: authz.status });
+  // Don't delete a run the worker is still executing (would corrupt its writes).
+  if (authz.run.status === "running" || authz.run.status === "awaiting_founder")
+    return NextResponse.json(
+      { error: "This session is still running — wait for it to finish before deleting." },
+      { status: 409 }
+    );
   await prisma.modeRun.delete({ where: { id: params.id } });
   return NextResponse.json({ ok: true });
 }

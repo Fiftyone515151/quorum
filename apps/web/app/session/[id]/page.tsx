@@ -41,7 +41,12 @@ export default function RunPage({ params }: { params: { id: string } }) {
 
   async function deleteRun() {
     if (!confirm("Delete this session? This can't be undone.")) return;
-    await fetch(`/api/runs/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/runs/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      alert(d.error ?? "Could not delete this session.");
+      return;
+    }
     router.push("/");
   }
 

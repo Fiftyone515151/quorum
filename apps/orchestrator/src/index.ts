@@ -173,7 +173,9 @@ async function handleRun(runId: string): Promise<void> {
 }
 
 async function main() {
-  console.log(`[orchestrator] listening on ${JOBS_QUEUE} (redis: ${REDIS_URL})`);
+  // Log the host only — REDIS_URL contains the password.
+  const redisHost = (() => { try { return new URL(REDIS_URL).host; } catch { return "redis"; } })();
+  console.log(`[orchestrator] listening on ${JOBS_QUEUE} (redis: ${redisHost})`);
   // Durable queue: BRPOP blocks until a job is available. Jobs LPUSH'd while the
   // worker was down are still here on reconnect (unlike pub/sub, which drops them).
   while (true) {

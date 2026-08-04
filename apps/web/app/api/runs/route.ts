@@ -45,6 +45,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "incompatible inheritance (only screening → IC)" }, { status: 400 });
   }
 
+  // Every chosen panelist must exist (else the RunRole insert 500s on the FK).
+  const found = await prisma.persona.findMany({ where: { id: { in: b.participants } }, select: { id: true } });
+  if (found.length !== b.participants.length)
+    return NextResponse.json({ error: "one or more selected panelists do not exist" }, { status: 400 });
+
   const companySnapshot = {
     name: company.name,
     bp: company.bp,
