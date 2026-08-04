@@ -29,8 +29,13 @@ export default function HistoryPage() {
 
   async function del(id: string) {
     if (!confirm("Delete this session? This can't be undone.")) return;
+    const res = await fetch(`/api/runs/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      alert(d.error ?? "Could not delete this session.");
+      return;
+    }
     setRuns((rs) => (rs ? rs.filter((r) => r.id !== id) : rs));
-    await fetch(`/api/runs/${id}`, { method: "DELETE" });
   }
 
   if (!runs) return <p className="text-muted">Loading…</p>;
