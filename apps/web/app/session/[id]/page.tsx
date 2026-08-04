@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const DIM_LABEL: Record<string, string> = {
   team: "Team", market: "Market", product: "Product",
@@ -45,48 +45,58 @@ export default function RunPage({ params }: { params: { id: string } }) {
     router.push("/");
   }
 
-  function nameMap(r: RunData | null): Record<string, { name: string; avatar?: string }> {
-    const m: Record<string, { name: string; avatar?: string }> = { host: { name: "Host" }, founder: { name: "Founder", avatar: "🙋" } };
-    r?.roles.forEach((x) => (m[x.persona.id] = { name: x.persona.name, avatar: x.persona.avatar }));
-    return m;
-  }
-
-  async function syncFromDb() {
-    const d = await fetch(`/api/runs/${id}`).then((r) => r.json());
-    if (!d.run) return;
-    const nm = nameMap(d.run);
-    setRun(d.run); setStatus(d.run.status); setResult(d.run.result ?? null);
-    setFeed(
-      d.run.turns.map((t: any) => ({
-        kind: "turn" as const, id: t.id, actor: t.actor,
-        actorName: nm[t.actor]?.name ?? t.actor, avatar: nm[t.actor]?.avatar,
-        segment: t.segment, content: t.content, fields: t.fields,
-      }))
-    );
-  }
-
-  useEffect(() => { syncFromDb(); /* eslint-disable-next-line */ }, [id]);
+  // Apply one run event to local state. Shared by replay (on load) and the live
+  // tail, so a reload rebuilds the exact same transcript, including a pending
+  // founder prompt.
+  const applyEvent = useCallback((ev: any) => {
+    switch (ev.type) {
+      case "segment":
+        setFeed((f) => [...f, { kind: "segment", id: `seg-${ev.segment}-${f.length}`, label: ev.label ?? ev.segment }]);
+        break;
+      case "turn.completed":
+        setFeed((f) => [...f, {
+          kind: "turn", id: ev.id, actor: ev.actor,
+          actorName: ev.actorName ?? (ev.actor === "host" ? "Host" : ev.actor === "founder" ? "Founder" : ev.actor),
+          avatar: ev.avatar, segment: ev.segment, content: ev.content, fields: ev.fields,
+        }]);
+        if (ev.actor === "founder") setAwaitFounder(null); // founder step answered
+        break;
+      case "await_founder": setAwaitFounder({ kind: ev.kind, ...(ev.payload as any) }); break;
+      case "notice": setFeed((f) => [...f, { kind: "notice", id: crypto.randomUUID(), text: ev.text }]); break;
+      case "result": setResult(ev.payload); break;
+      case "status": setStatus(ev.status); break;
+      case "run.failed": setFeed((f) => [...f, { kind: "notice", id: crypto.randomUUID(), text: `⚠️ ${ev.error}` }]); break;
+    }
+  }, []);
 
   useEffect(() => {
-    const es = new EventSource(`/api/runs/${id}/stream`);
-    es.onmessage = (e) => {
-      let ev: any; try { ev = JSON.parse(e.data); } catch { return; }
-      switch (ev.type) {
-        case "segment": setFeed((f) => [...f, { kind: "segment", id: `seg-${ev.segment}-${f.length}`, label: ev.label ?? ev.segment }]); break;
-        case "turn.completed":
-          setFeed((f) => [...f, { kind: "turn", id: ev.id, actor: ev.actor, actorName: ev.actorName, avatar: ev.avatar, segment: ev.segment, content: ev.content, fields: ev.fields }]);
-          if (ev.actor === "founder") setAwaitFounder(null); // founder step answered
-          break;
-        case "await_founder": setAwaitFounder({ kind: ev.kind, ...(ev.payload as any) }); break;
-        case "notice": setFeed((f) => [...f, { kind: "notice", id: crypto.randomUUID(), text: ev.text }]); break;
-        case "result": setResult(ev.payload); break;
-        case "status": setStatus(ev.status); break;
-        case "run.failed": setFeed((f) => [...f, { kind: "notice", id: crypto.randomUUID(), text: `⚠️ ${ev.error}` }]); break;
-        case "run.completed": es.close(); syncFromDb(); break;
-      }
-    };
-    es.onerror = () => {};
-    return () => es.close();
+    let closed = false;
+    let es: EventSource | null = null;
+    (async () => {
+      // run meta (roles / company snapshot / fallback status+result)
+      const d = await fetch(`/api/runs/${id}`).then((r) => r.json()).catch(() => null);
+      if (closed) return;
+      if (d?.run) { setRun(d.run); setStatus(d.run.status); setResult(d.run.result ?? null); }
+      // rebuild the transcript from the durable event log (survives reload)
+      setFeed([]);
+      let maxSeq = 0;
+      try {
+        const r = await fetch(`/api/runs/${id}/events?after=0`).then((x) => x.json());
+        for (const row of r.events ?? []) { applyEvent(row.payload); if (row.seq > maxSeq) maxSeq = row.seq; }
+      } catch { /* ignore */ }
+      if (closed) return;
+      // live tail from just after the replayed point; EventSource also sends
+      // Last-Event-ID automatically on reconnect, so mid-stream drops recover too.
+      es = new EventSource(`/api/runs/${id}/stream?after=${maxSeq}`);
+      es.onmessage = (e) => {
+        let ev: any; try { ev = JSON.parse(e.data); } catch { return; }
+        if (ev.type === "hello") return;
+        applyEvent(ev);
+        if (ev.type === "run.completed") es?.close();
+      };
+      es.onerror = () => {};
+    })();
+    return () => { closed = true; es?.close(); };
     /* eslint-disable-next-line */
   }, [id]);
 
