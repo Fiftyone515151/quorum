@@ -32,6 +32,19 @@ export async function POST(req: NextRequest) {
   if (!company || company.ownerId !== s.userId)
     return NextResponse.json({ error: "company not found" }, { status: 404 });
 
+  // Inheritance: the upstream run must belong to this user (no cross-user leak)
+  // and follow the only supported funnel, screening → IC.
+  if (b.inheritedFromId) {
+    const upstream = await prisma.modeRun.findUnique({
+      where: { id: b.inheritedFromId },
+      include: { company: { select: { ownerId: true } } },
+    });
+    if (!upstream || upstream.company.ownerId !== s.userId)
+      return NextResponse.json({ error: "inheritedFromId not found" }, { status: 404 });
+    if (b.mode !== "ic" || upstream.mode !== "screening")
+      return NextResponse.json({ error: "incompatible inheritance (only screening → IC)" }, { status: 400 });
+  }
+
   const companySnapshot = {
     name: company.name,
     bp: company.bp,
