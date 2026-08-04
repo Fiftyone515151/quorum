@@ -12,5 +12,6 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/new", "/history", "/session/:path*"],
+  // "/" is public (landing page); the app pages stay protected.
+  matcher: ["/new", "/history", "/session/:path*"],
 };

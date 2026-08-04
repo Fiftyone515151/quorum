@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@quorum/db";
 import { getSession } from "@/lib/auth";
 import CompaniesManager from "@/components/CompaniesManager";
+import Landing from "@/components/landing/Landing";
 
 export const dynamic = "force-dynamic";
 
@@ -14,9 +15,13 @@ const MODES = [
 
 export default async function HomePage() {
   const session = await getSession();
-  const companies = session
-    ? await prisma.company.findMany({ where: { ownerId: session.userId }, orderBy: { updatedAt: "desc" } })
-    : [];
+  // Logged-out visitors see the public marketing landing page.
+  if (!session) return <Landing />;
+
+  const companies = await prisma.company.findMany({
+    where: { ownerId: session.userId },
+    orderBy: { updatedAt: "desc" },
+  });
 
   return (
     <div className="flex flex-col gap-10">
