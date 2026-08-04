@@ -73,11 +73,28 @@ model ModeRun {
 
   roles         RunRole[]
   turns         Turn[]
+  events        RunEvent[]
   founderInputs FounderInput[]
   result        Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+/// Append-only, ordered log of run events for durable SSE replay (P1).
+/// Turn stays as the transcript projection; this is the replay source of truth.
+model RunEvent {
+  id        String   @id @default(cuid())
+  runId     String
+  run       ModeRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  seq       Int
+  type      String
+  version   Int      @default(1)
+  payload   Json
+  createdAt DateTime @default(now())
+
+  @@unique([runId, seq])
+  @@index([runId, seq])
 }
 
 model RunRole {

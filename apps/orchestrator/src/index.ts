@@ -102,15 +102,33 @@ async function persist(runId: string, e: RunEvent): Promise<void> {
   }
 }
 
+// Event types that the UI replays on (re)connect. Streaming deltas are excluded
+// to keep the log lean — the client renders turns only when completed.
+const REPLAY_TYPES = new Set([
+  "run.started", "segment", "turn.completed", "notice", "await_founder", "result", "status", "run.failed", "run.completed",
+]);
+
 async function handleRun(runId: string): Promise<void> {
   if (running.has(runId)) return;
   running.add(runId);
   console.log(`[orchestrator] starting run ${runId}`);
   try {
     const ctx = await loadContext(runId);
+    // Monotonic per-run sequence for the durable replay log. Resume from the
+    // existing max so re-processing a run can't collide on @@unique([runId, seq]).
+    const lastEvent = await prisma.runEvent.findFirst({ where: { runId }, orderBy: { seq: "desc" } });
+    let seq = lastEvent?.seq ?? 0;
     const emit = async (event: RunEvent) => {
       try { await persist(runId, event); } catch (err) { console.error("[orchestrator] persist error", err); }
-      await cmd.publish(eventsChannel(runId), JSON.stringify(event));
+      let outbound: RunEvent & { seq?: number } = event;
+      if (REPLAY_TYPES.has(event.type)) {
+        seq += 1;
+        outbound = { ...event, seq };
+        try {
+          await prisma.runEvent.create({ data: { runId, seq, type: event.type, payload: event as any } });
+        } catch (err) { console.error("[orchestrator] runEvent persist error", err); }
+      }
+      await cmd.publish(eventsChannel(runId), JSON.stringify(outbound));
     };
     await runMode(ctx, {
       emit,
