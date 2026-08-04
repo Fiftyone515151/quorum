@@ -2,26 +2,25 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import StartupFields, { emptyStartupForm, companyToForm, toCompanyBody } from "./StartupFields";
 
 interface Company {
-  id: string; name: string; bp: string; bpFileName?: string | null; stage: string;
+  id: string; name: string; bp: string; bpFileName?: string | null; stage: string; profile?: any;
   fundingCurrency?: string | null; valuation?: string | null; roundSize?: string | null; topic?: string | null;
 }
-const STAGES = ["pre_seed", "seed", "A"];
-const blank = { name: "", bp: "", bpFileName: "", stage: "seed", fundingCurrency: "USD", valuation: "", roundSize: "", topic: "" };
 
 export default function CompaniesManager({ initial }: { initial: Company[] }) {
   const router = useRouter();
   const [companies, setCompanies] = useState<Company[]>(initial);
   const [editing, setEditing] = useState<string | "new" | null>(initial.length === 0 ? "new" : null);
-  const [form, setForm] = useState<any>(blank);
+  const [form, setForm] = useState<any>(emptyStartupForm);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function startEdit(c: Company | null) {
     setError(null);
-    if (c) { setEditing(c.id); setForm({ ...blank, ...c }); }
-    else { setEditing("new"); setForm(blank); }
+    if (c) { setEditing(c.id); setForm(companyToForm(c)); }
+    else { setEditing("new"); setForm(emptyStartupForm); }
   }
 
   async function uploadBp(file: File) {
@@ -34,14 +33,14 @@ export default function CompaniesManager({ initial }: { initial: Company[] }) {
 
   async function save() {
     setError(null);
-    if (!form.name.trim() || !form.bp.trim()) return setError("Name and BP are required.");
+    if (!form.name.trim() || !form.topic.trim()) return setError("Name and one-liner are required.");
     setBusy(true);
     try {
       const isNew = editing === "new";
       const res = await fetch(isNew ? "/api/companies" : `/api/companies/${editing}`, {
         method: isNew ? "POST" : "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(toCompanyBody(form)),
       });
       const d = await res.json();
       if (!res.ok) throw new Error(typeof d.error === "string" ? d.error : "Save failed");
@@ -58,6 +57,18 @@ export default function CompaniesManager({ initial }: { initial: Company[] }) {
     router.refresh();
   }
 
+  const editor = (isNew: boolean) => (
+    <div className="card flex flex-col gap-3 p-4">
+      <p className="label">{isNew ? "New startup" : "Edit startup"}</p>
+      <StartupFields form={form} setForm={setForm} onUpload={uploadBp} />
+      {error && <p className="text-xs text-brass">{error}</p>}
+      <div className="flex gap-2">
+        <button onClick={save} disabled={busy} className="btn-primary">{busy ? "Saving…" : "Save"}</button>
+        <button onClick={() => setEditing(null)} className="btn-ghost">Cancel</button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center">
@@ -67,7 +78,7 @@ export default function CompaniesManager({ initial }: { initial: Company[] }) {
 
       {companies.map((c) =>
         editing === c.id ? (
-          <Editor key={c.id} form={form} setForm={setForm} onSave={save} onCancel={() => setEditing(null)} onUpload={uploadBp} busy={busy} error={error} />
+          <div key={c.id}>{editor(false)}</div>
         ) : (
           <div key={c.id} className="card flex items-center gap-3 p-4">
             <span className="text-sm font-medium text-white">{c.name}</span>
@@ -78,47 +89,7 @@ export default function CompaniesManager({ initial }: { initial: Company[] }) {
         )
       )}
 
-      {editing === "new" && (
-        <Editor form={form} setForm={setForm} onSave={save} onCancel={() => setEditing(null)} onUpload={uploadBp} busy={busy} error={error} isNew />
-      )}
-    </div>
-  );
-}
-
-function Editor({ form, setForm, onSave, onCancel, onUpload, busy, error, isNew }: any) {
-  const set = (k: string) => (e: any) => setForm((f: any) => ({ ...f, [k]: e.target.value }));
-  return (
-    <div className="card flex flex-col gap-3 p-4">
-      <p className="label">{isNew ? "New startup" : "Edit startup"}</p>
-      <input value={form.name} onChange={set("name")} placeholder="Startup name" className="rounded-lg border border-line bg-ink p-3 text-sm text-white outline-none focus:border-accent" />
-      <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-line bg-ink p-3 text-sm hover:border-accent">
-        <input type="file" accept=".pdf,.docx,.txt,.md" className="hidden" onChange={(e) => e.target.files?.[0] && onUpload(e.target.files[0])} />
-        {form.bpFileName || form.bp ? (
-          <>
-            <span className="text-accent">📄</span>
-            <span className="truncate text-white">{form.bpFileName || "BP on file"}</span>
-            <span className="label text-muted ml-auto shrink-0">Replace</span>
-          </>
-        ) : (
-          <>
-            <span className="text-muted">Upload BP</span>
-            <span className="label text-muted ml-auto shrink-0">.pdf .docx .txt .md</span>
-          </>
-        )}
-      </label>
-      <div className="flex flex-wrap gap-2">
-        <select value={form.stage} onChange={set("stage")} className="rounded-lg border border-line bg-ink p-2 text-sm text-white">
-          {STAGES.map((s) => <option key={s} value={s}>{s === "A" ? "Series A" : s}</option>)}
-        </select>
-        <input value={form.fundingCurrency ?? ""} onChange={set("fundingCurrency")} placeholder="Currency" className="w-24 rounded-lg border border-line bg-ink p-2 text-sm text-white outline-none focus:border-accent" />
-        <input value={form.valuation ?? ""} onChange={set("valuation")} placeholder="Valuation" className="w-32 rounded-lg border border-line bg-ink p-2 text-sm text-white outline-none focus:border-accent" />
-        <input value={form.roundSize ?? ""} onChange={set("roundSize")} placeholder="Round size" className="w-32 rounded-lg border border-line bg-ink p-2 text-sm text-white outline-none focus:border-accent" />
-      </div>
-      {error && <p className="text-xs text-brass">{error}</p>}
-      <div className="flex gap-2">
-        <button onClick={onSave} disabled={busy} className="btn-primary">{busy ? "Saving…" : "Save"}</button>
-        <button onClick={onCancel} className="btn-ghost">Cancel</button>
-      </div>
+      {editing === "new" && editor(true)}
     </div>
   );
 }
