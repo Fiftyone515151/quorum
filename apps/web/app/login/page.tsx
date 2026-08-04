@@ -23,7 +23,7 @@ export default function LoginPage() {
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error ?? "Failed");
-      router.push("/");
+      router.push(mode === "register" ? "/onboarding" : "/");
       router.refresh();
     } catch (e: any) {
       setError(e.message);

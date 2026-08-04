@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma, Mode } from "@quorum/db";
 import { MIN_PANELISTS, MAX_PANELISTS, findDuplicates } from "@quorum/engine";
 import { getSession } from "@/lib/auth";
+import { assembleProfile } from "@/lib/profile";
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +53,9 @@ export async function POST(req: NextRequest) {
 
   const companySnapshot = {
     name: company.name,
-    bp: company.bp,
+    // What the panel reads: Q&A answers + uploaded doc, assembled into one corpus.
+    bp: assembleProfile({ topic: company.topic, profile: company.profile, fileText: company.bp }),
+    profile: company.profile,
     fundingCurrency: company.fundingCurrency,
     valuation: company.valuation,
     roundSize: company.roundSize,

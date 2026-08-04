@@ -2,13 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma, Stage } from "@quorum/db";
 import { getSession } from "@/lib/auth";
+import { cleanProfile, profileSchema } from "@/lib/profile";
 
 export const dynamic = "force-dynamic";
 
 const patchSchema = z.object({
   name: z.string().min(1).optional(),
-  bp: z.string().min(1).optional(),
+  bp: z.string().optional(),
   bpFileName: z.string().optional(),
+  profile: profileSchema.optional(),
   fundingCurrency: z.string().optional(),
   valuation: z.string().optional(),
   roundSize: z.string().optional(),
@@ -37,6 +39,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   const data: any = { ...parsed.data };
   if (data.stage) data.stage = data.stage as Stage;
+  if (data.profile !== undefined) data.profile = cleanProfile(data.profile);
   const c = await prisma.company.update({ where: { id: params.id }, data });
   return NextResponse.json({ company: c });
 }
