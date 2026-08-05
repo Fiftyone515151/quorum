@@ -132,6 +132,12 @@ function Editor({ form, setForm, onSave, onCancel, onUpload, busy, error, isNew 
         <input value={form.roundSize ?? ""} onChange={set("roundSize")} placeholder="Round size" className="w-32 rounded-lg border border-line bg-ink p-2 text-sm text-white outline-none focus:border-accent" />
       </div>
 
+      <label className="flex flex-col gap-1">
+        <span className="text-xs text-muted">Founding team — team composition, or the founder's background if solo</span>
+        <textarea value={form.profile?.founderTeam ?? ""} onChange={setProfile("founderTeam")} rows={2}
+          className="resize-y rounded-lg border border-line bg-ink p-2 text-sm text-white outline-none focus:border-accent" />
+      </label>
+
       <details className="rounded-lg border border-line bg-ink/40 p-3">
         <summary className="cursor-pointer text-xs font-medium text-muted">Startup profile — optional, sharpens the panel's read</summary>
         <div className="mt-3 flex flex-col gap-3">

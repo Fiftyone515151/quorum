@@ -3,7 +3,7 @@
 // Never blocks creation — on any failure we fall back to the raw answers.
 // Server-only: only imported by route handlers (uses DEEPSEEK_API_KEY).
 import { generateStructured } from "@quorum/engine";
-import { PROFILE_QUESTIONS, cleanProfile, profileSchema, type ProfileAnswers } from "./profile";
+import { PROFILE_FIELDS, cleanProfile, profileSchema, type ProfileAnswers } from "./profile";
 
 const SYSTEM = [
   "You clean up a startup founder's rough, chat-typed answers into tidy, readable profile fields for an investor panel to read.",
@@ -21,7 +21,7 @@ function buildUser(raw: ProfileAnswers): string {
     "Here are the founder's raw answers, keyed by field. Clean each one and return a JSON object with the same keys.",
     "",
   ];
-  for (const { key, label } of PROFILE_QUESTIONS) {
+  for (const { key, label } of PROFILE_FIELDS) {
     const v = raw[key];
     if (v && v.trim()) lines.push(`### ${key} (${label})\n${v.trim()}\n`);
   }
