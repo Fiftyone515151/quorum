@@ -57,8 +57,9 @@ export default function Landing() {
         <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-4 px-6 sm:grid-cols-2 lg:grid-cols-4">
           {MODES.map((m) => (
             <div key={m.id} className="flex flex-col gap-2 rounded-xl bg-brand px-5 py-6 text-white">
-              <div className="flex items-center gap-2 text-lg font-semibold">
-                <span>{m.emoji}</span><span>{m.name}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-lg">{m.emoji}</span>
+                <Pixel className="text-xs text-white sm:text-sm">{m.name}</Pixel>
               </div>
               <p className="text-[15px] font-medium leading-relaxed text-white">{m.blurb}</p>
             </div>

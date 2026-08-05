@@ -1,17 +1,14 @@
-import Link from "next/link";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { prisma } from "@quorum/db";
 import { getSession } from "@/lib/auth";
-import CompaniesManager from "@/components/CompaniesManager";
+import { summarize } from "@/lib/runSummary";
 import Landing from "@/components/landing/Landing";
+import HomeHero from "@/components/home/HomeHero";
 
 export const dynamic = "force-dynamic";
 
-const MODES = [
-  { id: "screening", label: "Screening", emoji: "🎯", blurb: "Fast triage → ADVANCE / WATCH / PASS + crux" },
-  { id: "ic", label: "Investment Committee", emoji: "⚖️", blurb: "Adversarial verdict → INVEST / CONDITIONAL / PASS" },
-  { id: "board", label: "Board", emoji: "🛠️", blurb: "Post-investment priority list + risk coverage" },
-  { id: "tea", label: "Founder Tea", emoji: "🍵", blurb: "Open discussion, clues only" },
-];
+const ACTIVE_COOKIE = "quorum_active_company";
 
 export default async function HomePage() {
   const session = await getSession();
@@ -22,40 +19,31 @@ export default async function HomePage() {
     where: { ownerId: session.userId },
     orderBy: { updatedAt: "desc" },
   });
+  // No startup yet → run the guided setup first.
+  if (companies.length === 0) redirect("/onboarding");
+
+  // The "current" startup: the one in the cookie, else the most recent.
+  const cookieId = cookies().get(ACTIVE_COOKIE)?.value;
+  const active = companies.find((c) => c.id === cookieId) ?? companies[0];
+
+  const runs = await prisma.modeRun.findMany({
+    where: { companyId: active.id, deletedAt: null },
+    orderBy: { createdAt: "desc" },
+    take: 100,
+  });
+
+  const meetings = runs.map((r) => ({
+    id: r.id,
+    mode: r.mode,
+    createdAt: r.createdAt.toISOString(),
+    preview: summarize(r.mode, r.result, r.status),
+  }));
 
   return (
-    <div className="flex flex-col gap-10">
-      <section className="flex flex-col gap-2">
-        <p className="label">Simulated VC panel</p>
-        <h1 className="max-w-2xl text-2xl font-semibold leading-tight text-white">
-          Save your startup once, then run it past a VC panel any time.
-        </h1>
-      </section>
-
-      <CompaniesManager initial={companies as any} />
-
-      <section className="flex flex-col gap-3">
-        <p className="label">
-          Pick a meeting to start
-          {companies.length === 0 && <span className="ml-2 text-brass">— add a startup above first</span>}
-        </p>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {MODES.map((m) => {
-            const disabled = companies.length === 0;
-            const inner = (
-              <>
-                <div className="mb-1 flex items-center gap-2 text-white"><span>{m.emoji}</span><span className="font-medium">{m.label}</span></div>
-                <p className="text-sm text-muted">{m.blurb}</p>
-              </>
-            );
-            return disabled ? (
-              <div key={m.id} className="card cursor-not-allowed p-5 opacity-50">{inner}</div>
-            ) : (
-              <Link key={m.id} href={`/new?mode=${m.id}`} className="card p-5 transition hover:border-accent">{inner}</Link>
-            );
-          })}
-        </div>
-      </section>
-    </div>
+    <HomeHero
+      companies={companies.map((c) => ({ id: c.id, name: c.name, stage: c.stage }))}
+      active={{ id: active.id, name: active.name, stage: active.stage, topic: active.topic }}
+      meetings={meetings}
+    />
   );
 }

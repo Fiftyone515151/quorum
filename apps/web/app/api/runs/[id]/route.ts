@@ -31,6 +31,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
       { error: "This session is still running — wait for it to finish before deleting." },
       { status: 409 }
     );
-  await prisma.modeRun.delete({ where: { id: params.id } });
+  // Soft delete: hide from lists but keep the record recoverable for 30 days.
+  await prisma.modeRun.update({ where: { id: params.id }, data: { deletedAt: new Date() } });
   return NextResponse.json({ ok: true });
 }
