@@ -1,20 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
-import { prisma, Stage } from "@quorum/db";
+import { prisma } from "@quorum/db";
 import { getSession } from "@/lib/auth";
+import { buildCompanyData, companyInputSchema } from "@/lib/companyWrite";
 
 export const dynamic = "force-dynamic";
-
-const schema = z.object({
-  name: z.string().min(1),
-  bp: z.string().min(1),
-  bpFileName: z.string().optional(),
-  fundingCurrency: z.string().optional(),
-  valuation: z.string().optional(),
-  roundSize: z.string().optional(),
-  stage: z.enum(["pre_seed", "seed", "A"]),
-  topic: z.string().optional(),
-});
 
 export async function GET() {
   const s = await getSession();
@@ -29,10 +18,21 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const s = await getSession();
   if (!s) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  const parsed = schema.safeParse(await req.json());
+  const parsed = companyInputSchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  if (!parsed.data.name?.trim()) return NextResponse.json({ error: "Startup name is required." }, { status: 400 });
+
+  const data = await buildCompanyData(parsed.data);
+  if (!data || !data.bp) return NextResponse.json({ error: "Add a business plan or a one-liner first." }, { status: 400 });
+
   const c = await prisma.company.create({
-    data: { ...parsed.data, stage: parsed.data.stage as Stage, ownerId: s.userId },
+    data: { ...data, name: data.name!, bp: data.bp, ownerId: s.userId },
   });
+
+  // Finishing onboarding (even if optional questions were skipped) marks the
+  // user onboarded so they aren't bounced back to the guided flow.
+  if (parsed.data.fromOnboarding) {
+    await prisma.user.update({ where: { id: s.userId }, data: { onboardedAt: new Date() } });
+  }
   return NextResponse.json({ company: c });
 }

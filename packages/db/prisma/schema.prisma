@@ -15,6 +15,7 @@ model User {
   name      String?
   companies Company[]
   personas  Persona[]
+  onboardedAt DateTime?
   createdAt DateTime  @default(now())
 }
 
@@ -46,13 +47,15 @@ model Company {
   ownerId         String
   owner           User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   name            String
-  bp              String    @db.Text
+  bp              String    @db.Text // derived panel corpus = assembleProfile(topic, profile, docText)
+  docText         String?   @db.Text // raw extracted text of the uploaded doc(s); source for bp
   bpFileName      String?
   fundingCurrency String?
   valuation       String?
   roundSize       String?
   stage           Stage     @default(seed)
   topic           String?
+  profile         Json?
   runs            ModeRun[]
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
