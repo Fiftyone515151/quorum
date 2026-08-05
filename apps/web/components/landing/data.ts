@@ -12,8 +12,8 @@ export interface ModeInfo {
   name: string;
   emoji: string;
   blurb: string;
-  summary: string;
-  output: string;
+  happens: string[]; // "How it works" bullets
+  get: string[]; // "What you get" bullets
 }
 
 export const MODES: ModeInfo[] = [
@@ -22,36 +22,71 @@ export const MODES: ModeInfo[] = [
     name: "Screening",
     emoji: "🎯",
     blurb: "Fast triage — the reason you'd get a no.",
-    summary:
-      "A rapid first pass where each investor independently scores only the dimensions they own, then clashes on the biggest disagreements.",
-    output: "ADVANCE / WATCH / PASS, a dimension scorecard, the crux question you must answer, and coverage gaps.",
+    happens: [
+      "Each investor scores only the dimensions they own",
+      "Independently first — no groupthink",
+      "Then they clash on the biggest disagreements",
+    ],
+    get: [
+      "ADVANCE / WATCH / PASS",
+      "A per-dimension scorecard",
+      "The crux question you must answer",
+      "The coverage gaps to fill",
+    ],
   },
   {
     id: "ic",
     name: "Investment Committee",
     emoji: "⚖️",
     blurb: "An adversarial invest / pass verdict.",
-    summary:
-      "A champion argues to invest while dissenters attack the case. No voting, no averaging — one fatal concern can kill the deal.",
-    output: "INVEST / CONDITIONAL / PASS with the rationale, the deciding crux, the dissent, and any conditions.",
+    happens: [
+      "A champion makes the case to invest",
+      "Dissenters attack it head-on",
+      "No voting, no averaging",
+      "One fatal concern can kill the deal",
+    ],
+    get: [
+      "INVEST / CONDITIONAL / PASS",
+      "The deciding crux",
+      "The strongest dissent",
+      "Any conditions to clear",
+    ],
   },
   {
     id: "board",
     name: "Board",
     emoji: "🛠️",
     blurb: "A post-investment priority list.",
-    summary:
-      "Assumes you're funded: the board surfaces the ways startups like yours fail across every risk axis, and you respond to each item.",
-    output: "A prioritized action list (severity × your response), plus a risk-coverage snapshot and gaps.",
+    happens: [
+      "Assumes you're already funded",
+      "Surfaces how startups like yours fail",
+      "Across every risk axis",
+      "You respond to each item",
+    ],
+    get: [
+      "A prioritized action list",
+      "Severity × your response",
+      "A risk-coverage snapshot",
+      "The remaining gaps",
+    ],
   },
   {
     id: "tea",
     name: "Founder Tea",
     emoji: "🍵",
     blurb: "Open, divergent discussion.",
-    summary:
-      "No fixed agenda — investors riff off each other and offer clues, never conclusions, to surface angles you hadn't considered.",
-    output: "A map of themes, surprising angles, open questions, and unresolved disagreements.",
+    happens: [
+      "No fixed agenda",
+      "Investors riff off each other",
+      "Clues, never conclusions",
+      "Surfaces angles you missed",
+    ],
+    get: [
+      "A map of themes",
+      "Surprising angles",
+      "Open questions",
+      "Unresolved disagreements",
+    ],
   },
 ];
 
