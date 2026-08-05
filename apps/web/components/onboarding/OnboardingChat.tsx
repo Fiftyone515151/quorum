@@ -207,8 +207,7 @@ export default function OnboardingChat({ adding }: { adding: boolean }) {
           topic: finalAnswers.topic,
           stage: finalAnswers.stage,
           profile,
-          docText: attached.map((a) => `# ${a.fileName}\n${a.text}`).join("\n\n---\n\n"),
-          bpFileName: attached.map((a) => a.fileName).join(", "),
+          documents: attached.map((a) => ({ fileName: a.fileName, text: a.text })),
           fromOnboarding: true,
         }),
       });

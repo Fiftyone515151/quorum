@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@quorum/db";
 import { getSession } from "@/lib/auth";
 import { buildCompanyData, companyInputSchema } from "@/lib/companyWrite";
+import { rebuildCorpus } from "@/lib/corpus";
 
 export const dynamic = "force-dynamic";
 
@@ -26,15 +27,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const parsed = companyInputSchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const data = await buildCompanyData(parsed.data, {
-    topic: current.topic,
-    profile: current.profile,
-    docText: current.docText,
-  });
-  if (!data) return NextResponse.json({ error: "Nothing left to describe the startup." }, { status: 400 });
-
-  const c = await prisma.company.update({ where: { id: params.id }, data });
-  return NextResponse.json({ company: c });
+  const data = await buildCompanyData(parsed.data);
+  await prisma.company.update({ where: { id: params.id }, data });
+  // Re-derive bp from the (possibly changed) topic/profile + existing documents.
+  const company = await rebuildCorpus(params.id);
+  return NextResponse.json({ company });
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
