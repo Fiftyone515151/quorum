@@ -30,20 +30,17 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-white font-sans text-navy">
       {/* Nav */}
-      <nav className="sticky top-0 z-20 border-b border-navy/10 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center gap-4 px-6 py-3">
-          <img src="/brand/lockup.png" alt="Quorum" className="h-7 w-auto sm:h-8" />
-          <div className="hidden flex-1 justify-center gap-7 text-sm font-medium text-navy/70 md:flex">
+      <nav className="sticky top-0 z-20 bg-white/90 backdrop-blur">
+        <div className="relative mx-auto flex max-w-6xl items-center px-6 py-3">
+          <img src="/brand/lockup.png" alt="Quorum" className="h-9 w-auto sm:h-12" />
+          <div className="absolute left-1/2 hidden -translate-x-1/2 gap-8 text-sm font-medium text-navy/70 md:flex">
             {NAV_LINKS.map((l) => (
               <a key={l.href} href={l.href} className="transition hover:text-brand">{l.label}</a>
             ))}
           </div>
-          <div className="ml-auto flex items-center gap-3">
-            <span className="hidden text-sm text-navy/60 sm:inline">Sign in to unlock the full experience.</span>
-            <Link href="/login" className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark">
-              Sign in
-            </Link>
-          </div>
+          <Link href="/login" className="ml-auto rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark">
+            Sign in
+          </Link>
         </div>
       </nav>
 
