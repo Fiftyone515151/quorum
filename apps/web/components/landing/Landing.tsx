@@ -40,6 +40,7 @@ export default function Landing() {
         <h1 className="max-w-3xl text-balance">
           <Pixel className="text-2xl sm:text-4xl">{HERO.question}</Pixel>
         </h1>
+        <p className="-mt-2 text-sm font-medium text-brand">{HERO.tagline}</p>
         <p className="max-w-2xl text-lg leading-relaxed text-navy/80">{HERO.intro}</p>
         <p className="max-w-3xl text-sm leading-relaxed text-navy/55">{HERO.secondPerson}</p>
       </header>

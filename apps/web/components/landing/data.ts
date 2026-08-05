@@ -2,6 +2,7 @@
 
 export const HERO = {
   question: "READY FOR THE PANEL?",
+  tagline: "Set up your startup in a minute.",
   intro: "Quorum convenes a panel of AI investors to pressure-test your startup — before the real ones do.",
   secondPerson: "See how a VC panel would judge your startup — and what to fix first.",
 };
