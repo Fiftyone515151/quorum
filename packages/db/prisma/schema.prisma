@@ -15,6 +15,7 @@ model User {
   name      String?
   companies Company[]
   personas  Persona[]
+  documents Document[]
   onboardedAt DateTime?
   createdAt DateTime  @default(now())
 }
@@ -47,8 +48,8 @@ model Company {
   ownerId         String
   owner           User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   name            String
-  bp              String    @db.Text // derived panel corpus = assembleProfile(topic, profile, docText)
-  docText         String?   @db.Text // raw extracted text of the uploaded doc(s); source for bp
+  bp              String    @db.Text // derived panel corpus = assembleProfile(topic, profile, documents)
+  docText         String?   @db.Text // legacy cache of the concatenated doc text; kept in sync, no longer the source
   bpFileName      String?
   fundingCurrency String?
   valuation       String?
@@ -56,9 +57,28 @@ model Company {
   stage           Stage     @default(seed)
   topic           String?
   profile         Json?
+  documents       Document[]
   runs            ModeRun[]
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+}
+
+/// A file in a company's library. Its text feeds the derived panel corpus (bp).
+model Document {
+  id        String   @id @default(cuid())
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fileName  String
+  ext       String
+  text      String   @db.Text
+  sizeBytes Int
+  hash      String // sha256 of the extracted text — dedup within a company
+  createdAt DateTime @default(now())
+
+  @@unique([companyId, hash])
+  @@index([companyId])
 }
 
 model ModeRun {
