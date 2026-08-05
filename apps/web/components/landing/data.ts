@@ -3,8 +3,7 @@
 export const HERO = {
   question: "READY FOR THE PANEL?",
   intro: "Quorum convenes a panel of AI investors to pressure-test your startup — before the real ones do.",
-  secondPerson:
-    "A multi-agent VC panel runs your startup through four meetings — Screening, Investment Committee, Board, and Founder Tea — and hands you what to fix.",
+  secondPerson: "See how a VC panel would judge your startup — and what to fix first.",
 };
 
 export interface ModeInfo {
