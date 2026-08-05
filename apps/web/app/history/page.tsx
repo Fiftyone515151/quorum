@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import AppShell from "@/components/AppShell";
 
 interface Preview { badge: string; tone: "good" | "warn" | "bad" | "neutral"; line: string }
 interface Run { id: string; mode: string; status: string; createdAt: string; companyId: string; companyName: string; preview: Preview }
@@ -20,7 +21,7 @@ const TONE: Record<Preview["tone"], string> = {
   neutral: "bg-white/5 text-muted",
 };
 
-export default function HistoryPage() {
+function HistoryPageInner() {
   const [runs, setRuns] = useState<Run[] | null>(null);
 
   useEffect(() => {
@@ -89,5 +90,13 @@ export default function HistoryPage() {
         </section>
       ))}
     </div>
+  );
+}
+
+export default function HistoryPage() {
+  return (
+    <AppShell>
+      <HistoryPageInner />
+    </AppShell>
   );
 }

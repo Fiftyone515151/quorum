@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import AppShell from "@/components/AppShell";
 
 const DIM_LABEL: Record<string, string> = {
   team: "Team", market: "Market", product: "Product",
@@ -24,7 +25,7 @@ interface RunData {
 
 const MODE_LABEL: Record<string, string> = { screening: "Screening", ic: "Investment Committee", board: "Board", tea: "Founder Tea" };
 
-export default function RunPage({ params }: { params: { id: string } }) {
+function RunPageInner({ params }: { params: { id: string } }) {
   const { id } = params;
   const router = useRouter();
   const [run, setRun] = useState<RunData | null>(null);
@@ -340,5 +341,13 @@ function BoardFounderForm({ payload, onSubmit }: { payload: any; onSubmit: (r: a
       <button onClick={() => onSubmit(items.map((it: any) => ({ id: it.id, status: resp[it.id]?.status ?? "unaware", note: resp[it.id]?.note })))}
         className="btn-primary mt-4">Submit responses</button>
     </div>
+  );
+}
+
+export default function RunPage(props: { params: { id: string } }) {
+  return (
+    <AppShell>
+      <RunPageInner {...props} />
+    </AppShell>
   );
 }

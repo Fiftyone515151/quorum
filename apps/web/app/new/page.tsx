@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import AppShell from "@/components/AppShell";
 
 interface PersonaDTO {
   id: string; name: string; avatar?: string; seat: string;
@@ -109,8 +110,10 @@ function NewSessionInner() {
 
 export default function NewSessionPage() {
   return (
-    <Suspense fallback={<p className="text-muted">Loading…</p>}>
-      <NewSessionInner />
-    </Suspense>
+    <AppShell>
+      <Suspense fallback={<p className="text-muted">Loading…</p>}>
+        <NewSessionInner />
+      </Suspense>
+    </AppShell>
   );
 }

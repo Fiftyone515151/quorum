@@ -80,6 +80,7 @@ model ModeRun {
   founderInputs FounderInput[]
   result        Json?
 
+  deletedAt DateTime? // soft delete — hidden from lists, recoverable for 30 days
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
