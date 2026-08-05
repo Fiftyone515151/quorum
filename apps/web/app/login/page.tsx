@@ -1,19 +1,31 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { HERO } from "@/components/landing/data";
+import { validatePassword, PASSWORD_RULE } from "@/lib/password";
 
 export default function LoginPage() {
   const router = useRouter();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const input =
+    "rounded-lg border border-navy/15 bg-white p-3 text-sm text-navy outline-none placeholder:text-navy/40 focus:border-brand";
+
   async function submit() {
     setError(null);
+    if (mode === "register") {
+      const v = validatePassword(password);
+      if (!v.ok) return setError(v.error);
+      if (password !== confirm) return setError("Passwords do not match.");
+    }
     setBusy(true);
     try {
       const res = await fetch(`/api/auth/${mode}`, {
@@ -32,58 +44,67 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="mx-auto mt-6 grid max-w-4xl gap-10 md:mt-14 md:grid-cols-2">
-      {/* intro (placeholder landing) */}
-      <div className="flex flex-col gap-5">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">⚖️</span>
-          <span className="font-mono text-xl font-semibold text-white">Quorum</span>
-        </div>
-        <h2 className="text-2xl font-semibold leading-snug text-white">
-          A simulated VC panel for fundraising founders.
-        </h2>
-        <p className="text-sm leading-relaxed text-muted">
-          Save your startup once, then convene a panel of investor personas to pressure-test it —
-          any time, from every angle. Quorum uses real VC decision logic (no voting, no averaging)
-          to turn the discussion into something you can act on.
-        </p>
-        <div className="flex flex-col gap-2 text-sm text-muted">
-          {[
-            ["🎯", "Screening", "fast triage — the reason you'd get a no, and the questions to answer"],
-            ["⚖️", "Investment Committee", "an adversarial invest / pass verdict"],
-            ["🛠️", "Board", "a post-investment priority list across the ways startups fail"],
-            ["🍵", "Founder Tea", "open, divergent discussion — angles you hadn't considered"],
-          ].map(([e, t, d]) => (
-            <div key={t} className="flex gap-2">
-              <span>{e}</span>
-              <span><span className="text-white">{t}</span> — {d}</span>
-            </div>
-          ))}
-        </div>
-        <p className="text-xs text-muted">Replies follow your BP's language; the interface is in English.</p>
+    <div className="min-h-screen bg-white font-sans text-navy">
+      <div className="px-6 py-4">
+        <Link href="/">
+          <img src="/brand/lockup.png" alt="Quorum" className="h-8 w-auto" />
+        </Link>
       </div>
 
-      {/* auth form */}
-      <div className="flex flex-col gap-4 md:mt-10">
-      <h1 className="text-xl font-semibold text-white">{mode === "login" ? "Sign in" : "Create account"}</h1>
+      <div className="mx-auto flex max-w-md flex-col items-center gap-6 px-6 pb-16 pt-6">
+        <p className="text-center">
+          <span className="font-pixel text-[11px] leading-[1.7] text-brand sm:text-xs">{HERO.secondPerson}</span>
+        </p>
 
-      {mode === "register" && (
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name (optional)"
-          className="rounded-lg border border-line bg-ink p-3 text-sm text-white outline-none focus:border-accent" />
-      )}
-      <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="Email"
-        className="rounded-lg border border-line bg-ink p-3 text-sm text-white outline-none focus:border-accent" />
-      <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="Password (min 6)"
-        onKeyDown={(e) => e.key === "Enter" && submit()}
-        className="rounded-lg border border-line bg-ink p-3 text-sm text-white outline-none focus:border-accent" />
+        <div className="flex w-full flex-col gap-4 rounded-2xl border border-navy/10 bg-white p-6 shadow-sm">
+          <h1 className="text-xl font-semibold text-navy">
+            {mode === "login" ? "Sign in" : "Create account"}
+          </h1>
 
-      {error && <p className="text-sm text-brass">{error}</p>}
-      <button onClick={submit} disabled={busy} className="btn-primary">
-        {busy ? "…" : mode === "login" ? "Sign in" : "Create account"}
-      </button>
-      <button onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(null); }} className="text-xs text-muted underline hover:text-white">
-        {mode === "login" ? "No account? Create one" : "Have an account? Sign in"}
-      </button>
+          {mode === "register" && (
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name (optional)" className={input} />
+          )}
+          <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="Email" className={input} />
+          <input
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            type="password"
+            placeholder="Password"
+            onKeyDown={(e) => e.key === "Enter" && mode === "login" && submit()}
+            className={input}
+          />
+          {mode === "register" && (
+            <>
+              <input
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                type="password"
+                placeholder="Confirm password"
+                onKeyDown={(e) => e.key === "Enter" && submit()}
+                className={input}
+              />
+              <p className="text-xs leading-relaxed text-navy/50">{PASSWORD_RULE}</p>
+            </>
+          )}
+
+          {error && <p className="text-sm text-brand-dark">{error}</p>}
+          <button
+            onClick={submit}
+            disabled={busy}
+            className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark disabled:opacity-50"
+          >
+            {busy ? "…" : mode === "login" ? "Sign in" : "Create account"}
+          </button>
+
+          <button
+            onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(null); }}
+            className="text-xs text-navy/60 underline hover:text-brand"
+          >
+            {mode === "login" ? "No account? Register" : "Have an account? Sign in"}
+          </button>
+        </div>
+
+        <p className="text-center text-xs text-navy/40">The interface is in English; replies follow your startup's language.</p>
       </div>
     </div>
   );

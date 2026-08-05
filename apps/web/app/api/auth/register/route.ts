@@ -2,19 +2,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@quorum/db";
 import { hashPassword, signToken, setSessionCookie } from "@/lib/auth";
+import { validatePassword } from "@/lib/password";
 
 export const dynamic = "force-dynamic";
 
 const schema = z.object({
   email: z.string().email(),
-  password: z.string().min(6),
+  password: z.string(),
   name: z.string().optional(),
 });
 
 export async function POST(req: NextRequest) {
   const parsed = schema.safeParse(await req.json());
-  if (!parsed.success) return NextResponse.json({ error: "Invalid email or password (min 6 chars)." }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: "Enter a valid email and password." }, { status: 400 });
   const { email, password, name } = parsed.data;
+  const pw = validatePassword(password);
+  if (!pw.ok) return NextResponse.json({ error: pw.error }, { status: 400 });
 
   const exists = await prisma.user.findUnique({ where: { email } });
   if (exists) return NextResponse.json({ error: "Email already registered." }, { status: 409 });
