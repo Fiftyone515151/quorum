@@ -26,6 +26,10 @@ describe("assembleProfile", () => {
   it("omits missing sections", () => {
     expect(assembleProfile({ topic: "solo" })).toBe("## One-liner\nsolo");
   });
+  it("includes the required founding-team field", () => {
+    const out = assembleProfile({ profile: { founderTeam: "Core team: 3 engineers" } });
+    expect(out).toBe("## Founding team\nCore team: 3 engineers");
+  });
 });
 
 describe("hasSubstance", () => {

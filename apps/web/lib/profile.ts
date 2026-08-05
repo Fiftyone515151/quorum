@@ -3,6 +3,7 @@
 import { z } from "zod";
 
 export interface ProfileAnswers {
+  founderTeam?: string; // required in onboarding (its own field, separate from the optional "team" below)
   problem?: string;
   product?: string;
   traction?: string;
@@ -16,7 +17,7 @@ export interface ProfileAnswers {
 
 export type ProfileKey = keyof ProfileAnswers;
 
-/** Dimension-aligned questions (B/C in the design). Order drives the form + assembly. */
+/** Dimension-aligned questions (B/C in the design). Order drives the optional form + assembly. */
 export const PROFILE_QUESTIONS: { key: ProfileKey; label: string; question: string }[] = [
   { key: "problem", label: "Problem & customer", question: "Who has the problem you solve, and what is it?" },
   { key: "product", label: "Product", question: "What have you built, and where's the 10x vs. alternatives?" },
@@ -29,16 +30,25 @@ export const PROFILE_QUESTIONS: { key: ProfileKey; label: string; question: stri
   { key: "askFocus", label: "What to pressure-test", question: "What do you most want this panel to challenge?" },
 ];
 
+export const FOUNDER_TEAM_LABEL = "Founding team";
+
+/** Every stored profile field with its section label, in assembly order.
+ *  = the required founding-team field, then the 9 optional dimension questions. */
+export const PROFILE_FIELDS: { key: ProfileKey; label: string }[] = [
+  { key: "founderTeam", label: FOUNDER_TEAM_LABEL },
+  ...PROFILE_QUESTIONS.map(({ key, label }) => ({ key, label })),
+];
+
 /** Zod schema for the profile answers (shared by the create/update routes). */
 export const profileSchema = z
-  .object(Object.fromEntries(PROFILE_QUESTIONS.map((q) => [q.key, z.string().optional()])) as Record<ProfileKey, z.ZodOptional<z.ZodString>>)
+  .object(Object.fromEntries(PROFILE_FIELDS.map((f) => [f.key, z.string().optional()])) as Record<ProfileKey, z.ZodOptional<z.ZodString>>)
   .partial();
 
 /** Keep only non-empty, known profile answers (trimmed). */
 export function cleanProfile(input: unknown): ProfileAnswers {
   const out: ProfileAnswers = {};
   if (!input || typeof input !== "object") return out;
-  for (const { key } of PROFILE_QUESTIONS) {
+  for (const { key } of PROFILE_FIELDS) {
     const v = (input as Record<string, unknown>)[key];
     if (typeof v === "string" && v.trim()) out[key] = v.trim();
   }
@@ -56,7 +66,7 @@ export function assembleProfile({ topic, profile, fileText }: AssembleInput): st
   const answers = cleanProfile(profile);
   const parts: string[] = [];
   if (topic && topic.trim()) parts.push(`## One-liner\n${topic.trim()}`);
-  for (const { key, label } of PROFILE_QUESTIONS) {
+  for (const { key, label } of PROFILE_FIELDS) {
     if (answers[key]) parts.push(`## ${label}\n${answers[key]}`);
   }
   if (fileText && fileText.trim()) parts.push(`## Uploaded document\n${fileText.trim()}`);

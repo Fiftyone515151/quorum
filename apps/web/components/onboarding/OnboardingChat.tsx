@@ -5,12 +5,13 @@ import { useRouter } from "next/navigation";
 import { PROFILE_QUESTIONS, type ProfileKey } from "@/lib/profile";
 
 // ── Conversation script ───────────────────────────────────────────────────
-type StepType = "text" | "stage" | "files";
+type StepType = "text" | "stage" | "files" | "choice";
 interface Step {
-  key: string; // "name" | "topic" | "stage" | "files" | ProfileKey
+  key: string; // "name" | "topic" | "stage" | "files" | "hasTeam" | "founderTeam" | ProfileKey
   type: StepType;
   optional: boolean;
   bot: string[]; // bot bubbles shown before awaiting this answer
+  choices?: { value: string; label: string }[]; // for type === "choice"
 }
 
 const STAGES: { value: string; label: string }[] = [
@@ -18,6 +19,11 @@ const STAGES: { value: string; label: string }[] = [
   { value: "seed", label: "Seed" },
   { value: "A", label: "Series A" },
 ];
+
+// The founding-team question branches on the yes/no answer.
+const TEAM_SOLO_Q =
+  "Briefly and objectively describe your background — past founding experience (if any), education, and work history.";
+const TEAM_YES_Q = "How many people are on your core team right now, and what does each of them do?";
 
 const STEPS: Step[] = [
   {
@@ -38,6 +44,18 @@ const STEPS: Step[] = [
     optional: false,
     bot: ["Upload your business plan or deck. You can add more than one file (PDF, DOCX, TXT, MD)."],
   },
+  {
+    key: "hasTeam",
+    type: "choice",
+    optional: false,
+    bot: ["Do you have a complete team yet?"],
+    choices: [
+      { value: "solo", label: "Not yet" },
+      { value: "team", label: "Yes" },
+    ],
+  },
+  // Question text is chosen at runtime from the hasTeam answer (see advance()).
+  { key: "founderTeam", type: "text", optional: false, bot: [] },
   ...PROFILE_QUESTIONS.map((q, i) => ({
     key: q.key as string,
     type: "text" as StepType,
@@ -98,7 +116,13 @@ export default function OnboardingChat({ adding }: { adding: boolean }) {
     setStepIndex(next);
     setDraft("");
     setError(null);
-    pushBot(STEPS[next].bot);
+    // The founding-team question is asked differently for solo vs. team.
+    const nextStep = STEPS[next];
+    if (nextStep.key === "founderTeam") {
+      pushBot([nextAnswers.hasTeam === "team" ? TEAM_YES_Q : TEAM_SOLO_Q]);
+    } else {
+      pushBot(nextStep.bot);
+    }
   }
 
   function sendText() {
@@ -113,6 +137,13 @@ export default function OnboardingChat({ adding }: { adding: boolean }) {
   function pickStage(value: string, label: string) {
     pushUser(label);
     const na = { ...answers, stage: value };
+    setAnswers(na);
+    advance(na);
+  }
+
+  function pickChoice(value: string, label: string) {
+    pushUser(label);
+    const na = { ...answers, [step.key]: value };
     setAnswers(na);
     advance(na);
   }
@@ -161,6 +192,11 @@ export default function OnboardingChat({ adding }: { adding: boolean }) {
     for (const q of PROFILE_QUESTIONS) {
       const v = finalAnswers[q.key];
       if (v && v.trim()) profile[q.key] = v.trim();
+    }
+    // Required founding-team answer, prefixed so the panel reads solo vs. team.
+    if (finalAnswers.founderTeam?.trim()) {
+      const prefix = finalAnswers.hasTeam === "team" ? "Core team: " : "No complete team yet. Founder background: ";
+      profile.founderTeam = prefix + finalAnswers.founderTeam.trim();
     }
     try {
       const res = await fetch("/api/companies", {
@@ -257,7 +293,19 @@ export default function OnboardingChat({ adding }: { adding: boolean }) {
             )}
 
             {/* Input row */}
-            {step?.type === "stage" ? (
+            {step?.type === "choice" ? (
+              <div className="flex flex-wrap gap-2">
+                {step.choices?.map((c) => (
+                  <button
+                    key={c.value}
+                    onClick={() => pickChoice(c.value, c.label)}
+                    className="rounded-lg border border-brand bg-white px-5 py-2 text-sm font-medium text-brand transition hover:bg-brand hover:text-white"
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            ) : step?.type === "stage" ? (
               <div className="flex flex-wrap gap-2">
                 {STAGES.map((s) => (
                   <button
