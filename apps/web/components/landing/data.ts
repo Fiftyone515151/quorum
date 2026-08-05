@@ -54,6 +54,24 @@ export const MODES: ModeInfo[] = [
   },
 ];
 
+// Two-layer persona architecture: every investor = a functional seat × a character.
+export const LAYERS = [
+  {
+    title: "Functional seat",
+    body: "What they own — market, product, team, growth, capital, or risk. Each seat scores only its part of the deal.",
+  },
+  {
+    title: "Character",
+    body: "How they think — worldview, temperament, and a signature move, so a growth optimist and a disciplined underwriter never sound alike.",
+  },
+];
+
+// The signature decision principle (deterministic logic, not vibes).
+export const PRINCIPLE = {
+  head: "No voting. No averaging.",
+  body: "One champion's conviction can carry a deal; one hard concern can kill it — Quorum reproduces how an investment committee actually decides, instead of blending everyone into one bland answer.",
+};
+
 // How a session runs today (honest to the current harness — refine later).
 export const HOW_IT_WORKS = [
   { step: "1", title: "Assemble", body: "Pick a panel of investor personas spanning market, product, team, growth, capital, and risk." },

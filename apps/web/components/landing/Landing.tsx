@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { HERO, MODES, HOW_IT_WORKS, TESTIMONIALS } from "./data";
+import { HERO, MODES, LAYERS, PRINCIPLE, HOW_IT_WORKS, TESTIMONIALS } from "./data";
 
 interface Persona { name: string; avatar?: string }
 
@@ -98,6 +98,23 @@ export default function Landing() {
             </p>
           </div>
 
+          {/* Two-layer architecture: Function × Character = a persona */}
+          <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-center">
+            <div className="flex-1 rounded-xl border border-navy/10 bg-white p-5 sm:max-w-xs">
+              <p className="font-pixel text-[10px] text-brand">{LAYERS[0].title}</p>
+              <p className="mt-2 text-sm leading-relaxed text-navy/75">{LAYERS[0].body}</p>
+            </div>
+            <span className="self-center font-pixel text-lg text-brand">×</span>
+            <div className="flex-1 rounded-xl border border-navy/10 bg-white p-5 sm:max-w-xs">
+              <p className="font-pixel text-[10px] text-brand">{LAYERS[1].title}</p>
+              <p className="mt-2 text-sm leading-relaxed text-navy/75">{LAYERS[1].body}</p>
+            </div>
+            <span className="self-center font-pixel text-lg text-brand">=</span>
+            <div className="flex items-center justify-center rounded-xl bg-navy px-5 py-4 text-center text-sm font-semibold text-white sm:max-w-[140px]">
+              a distinct investor
+            </div>
+          </div>
+
           <div className="flex flex-col gap-3">
             <Pixel className="text-[11px]">PERSONA LIBRARY</Pixel>
             <div className="flex gap-5 overflow-x-auto pb-3">
@@ -110,6 +127,12 @@ export default function Landing() {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Signature decision principle */}
+          <div className="rounded-2xl bg-brand px-6 py-8 text-center text-white">
+            <p className="font-pixel text-base leading-[1.7] sm:text-2xl">{PRINCIPLE.head}</p>
+            <p className="mx-auto mt-4 max-w-2xl text-sm leading-relaxed text-white">{PRINCIPLE.body}</p>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
