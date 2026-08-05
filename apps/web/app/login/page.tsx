@@ -33,8 +33,10 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(mode === "register" ? { email, password, name } : { email, password }),
       });
-      const d = await res.json();
-      if (!res.ok) throw new Error(d.error ?? "Failed");
+      // Tolerate an empty / non-JSON body (e.g. a 500) instead of surfacing an
+      // opaque "Unexpected end of JSON input".
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error ?? `Request failed (${res.status}).`);
       // New accounts go through the guided startup setup first.
       router.push(mode === "register" ? "/onboarding" : "/");
       router.refresh();
