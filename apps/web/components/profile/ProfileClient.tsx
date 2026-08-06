@@ -319,10 +319,29 @@ function CreateForm({ onCreated, onCancel }: { onCreated: (c: CompanyLite) => vo
   const [topic, setTopic] = useState("");
   const [stage, setStage] = useState("seed");
   const [profile, setProfile] = useState<Record<string, string>>({});
+  const [attached, setAttached] = useState<{ fileName: string; text: string }[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const setP = (k: string) => (e: any) => setProfile((p) => ({ ...p, [k]: e.target.value }));
+
+  async function attachFiles(files: FileList) {
+    setError(null); setUploading(true);
+    try {
+      const added: { fileName: string; text: string }[] = [];
+      for (const file of Array.from(files)) {
+        const fd = new FormData(); fd.append("file", file);
+        const res = await fetch("/api/upload", { method: "POST", body: fd });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error ?? `Could not read ${file.name}`);
+        added.push({ fileName: file.name, text: d.content });
+      }
+      setAttached((a) => [...a, ...added]);
+    } catch (e: any) { setError(e.message); } finally { setUploading(false); }
+  }
+  const removeAttached = (i: number) => setAttached((a) => a.filter((_, idx) => idx !== i));
 
   async function create() {
     setError(null);
@@ -332,7 +351,7 @@ function CreateForm({ onCreated, onCancel }: { onCreated: (c: CompanyLite) => vo
     for (const [k, v] of Object.entries(profile)) if (v.trim()) cleanProfile[k] = v.trim();
     const res = await fetch("/api/companies", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, topic, stage, profile: cleanProfile }),
+      body: JSON.stringify({ name, topic, stage, profile: cleanProfile, documents: attached }),
     });
     const d = await res.json();
     setBusy(false);
@@ -377,11 +396,34 @@ function CreateForm({ onCreated, onCancel }: { onCreated: (c: CompanyLite) => vo
             <textarea value={profile[q.key] ?? ""} onChange={setP(q.key)} rows={2} className={`${input} resize-y`} placeholder={q.question} />
           </label>
         ))}
+
+        {/* Documents */}
+        <div className="flex flex-col gap-2">
+          <span className="text-xs font-semibold text-navy/60">Documents (optional)</span>
+          <label
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => { e.preventDefault(); if (e.dataTransfer.files?.length) attachFiles(e.dataTransfer.files); }}
+            className="flex cursor-pointer flex-col items-center gap-1 rounded-xl border-2 border-dashed border-navy/20 bg-navy/[0.02] px-4 py-6 text-center text-sm text-navy/50 transition hover:border-brand hover:bg-brand-tint/40"
+          >
+            <input ref={fileRef} type="file" multiple accept=".pdf,.docx,.txt,.md,.markdown" className="hidden"
+              disabled={uploading} onChange={(e) => e.target.files?.length && attachFiles(e.target.files)} />
+            <span className="text-lg">⬆️</span>
+            <span>{uploading ? "Reading files…" : "Click to upload or drag & drop"}</span>
+            <span className="text-xs text-navy/40">PDF · DOCX · TXT · MD</span>
+          </label>
+          {attached.map((a, i) => (
+            <div key={i} className="flex items-center gap-3 rounded-lg border border-navy/10 px-3 py-2 text-sm">
+              <button onClick={() => removeAttached(i)} aria-label="Remove file" className="shrink-0 text-navy/40 transition hover:text-red-600">✕</button>
+              <span className="text-brand">📄</span>
+              <span className="min-w-0 flex-1 truncate text-navy/90">{a.fileName}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
       {error && <p className="text-sm text-brand-dark">{error}</p>}
       <div className="flex gap-2">
-        <button onClick={create} disabled={busy}
+        <button onClick={create} disabled={busy || uploading}
           className="rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark disabled:opacity-40">
           {busy ? "Creating…" : "Create startup"}
         </button>
@@ -390,7 +432,6 @@ function CreateForm({ onCreated, onCancel }: { onCreated: (c: CompanyLite) => vo
           Cancel
         </button>
       </div>
-      <p className="text-xs text-navy/40">You can upload business plans and documents after creating the startup.</p>
     </div>
   );
 }
