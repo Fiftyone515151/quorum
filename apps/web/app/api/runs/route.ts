@@ -79,15 +79,23 @@ export async function GET(req: NextRequest) {
   const s = await getSession();
   if (!s) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const companyId = req.nextUrl.searchParams.get("companyId") ?? undefined;
+  const deleted = req.nextUrl.searchParams.get("deleted") === "1";
+
+  // Recently-deleted view: soft-deleted runs from the last 30 days.
+  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const where = deleted
+    ? { company: { ownerId: s.userId }, deletedAt: { gte: cutoff }, ...(companyId ? { companyId } : {}) }
+    : { company: { ownerId: s.userId }, deletedAt: null, ...(companyId ? { companyId } : {}) };
+
   const runs = await prisma.modeRun.findMany({
-    where: { company: { ownerId: s.userId }, deletedAt: null, ...(companyId ? { companyId } : {}) },
-    orderBy: { createdAt: "desc" },
+    where,
+    orderBy: deleted ? { deletedAt: "desc" } : { createdAt: "desc" },
     take: 100,
     include: { company: { select: { id: true, name: true } } },
   });
   return NextResponse.json({
     runs: runs.map((r) => ({
-      id: r.id, mode: r.mode, status: r.status, createdAt: r.createdAt,
+      id: r.id, mode: r.mode, status: r.status, createdAt: r.createdAt, deletedAt: r.deletedAt,
       companyId: r.companyId, companyName: (r.companySnapshot as any)?.name ?? r.company.name,
       preview: summarize(r.mode, r.result, r.status),
     })),

@@ -20,7 +20,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   return NextResponse.json({ run: authz.run });
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const authz = await authorizeRun(await getSession(), params.id, (id) =>
     prisma.modeRun.findUnique({ where: { id }, include: { company: { select: { ownerId: true } } } })
   );
@@ -31,7 +31,13 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
       { error: "This session is still running — wait for it to finish before deleting." },
       { status: 409 }
     );
-  // Soft delete: hide from lists but keep the record recoverable for 30 days.
-  await prisma.modeRun.update({ where: { id: params.id }, data: { deletedAt: new Date() } });
+
+  // `?permanent=1` hard-deletes (used by "Delete permanently" in Settings);
+  // otherwise soft delete — hidden from lists but recoverable for 30 days.
+  if (req.nextUrl.searchParams.get("permanent") === "1") {
+    await prisma.modeRun.delete({ where: { id: params.id } });
+  } else {
+    await prisma.modeRun.update({ where: { id: params.id }, data: { deletedAt: new Date() } });
+  }
   return NextResponse.json({ ok: true });
 }
