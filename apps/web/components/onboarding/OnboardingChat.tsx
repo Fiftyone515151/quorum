@@ -16,6 +16,7 @@ interface Step {
 
 const STAGES: { value: string; label: string }[] = [
   { value: "pre_seed", label: "Pre-seed" },
+  { value: "angel", label: "Angel" },
   { value: "seed", label: "Seed" },
   { value: "A", label: "Series A" },
 ];
@@ -37,13 +38,13 @@ const STEPS: Step[] = [
     ],
   },
   { key: "topic", type: "text", optional: false, bot: ["In one line, what do you do?"] },
-  { key: "stage", type: "stage", optional: false, bot: ["What stage are you at?"] },
   {
     key: "files",
     type: "files",
-    optional: false,
-    bot: ["Upload your business plan or deck. You can add more than one file (PDF, DOCX, TXT, MD)."],
+    optional: true,
+    bot: ["Upload your business plan or deck (optional). You can add more than one file (PDF, DOCX, TXT, MD)."],
   },
+  { key: "stage", type: "stage", optional: false, bot: ["What stage are you at?"] },
   {
     key: "hasTeam",
     type: "choice",
@@ -151,6 +152,13 @@ export default function OnboardingChat({ adding }: { adding: boolean }) {
   function skip() {
     pushUser("Skipped — I'll add this later");
     advance(answers);
+  }
+
+  // Bail out of the whole guided setup — mark onboarded so we don't loop back.
+  async function skipAll() {
+    await fetch("/api/onboarding/skip", { method: "POST" });
+    router.push("/");
+    router.refresh();
   }
 
   async function attachFiles(files: FileList) {
@@ -360,6 +368,15 @@ export default function OnboardingChat({ adding }: { adding: boolean }) {
                 Skip, add later
               </button>
             )}
+          </div>
+        )}
+
+        {/* Global skip — bottom-right of the chat card */}
+        {!done && (
+          <div className="px-5 pb-2 text-right">
+            <button onClick={skipAll} className="text-xs text-navy/40 underline underline-offset-2 transition hover:text-brand">
+              skip, set up later
+            </button>
           </div>
         )}
       </div>
