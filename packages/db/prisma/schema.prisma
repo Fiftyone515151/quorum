@@ -23,6 +23,7 @@ model User {
 // ---------- Quorum VC domain ----------
 enum Stage {
   pre_seed
+  angel
   seed
   A
 }

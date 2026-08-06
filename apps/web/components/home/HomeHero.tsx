@@ -22,7 +22,7 @@ const MODE_NAME: Record<string, string> = {
 const TONE_TEXT: Record<RunPreview["tone"], string> = {
   good: "text-emerald-600", warn: "text-amber-600", bad: "text-red-600", neutral: "text-navy/60",
 };
-const STAGE_LABEL: Record<string, string> = { pre_seed: "Pre-seed", seed: "Seed", A: "Series A" };
+const STAGE_LABEL: Record<string, string> = { pre_seed: "Pre-seed", angel: "Angel", seed: "Seed", A: "Series A" };
 
 function Pixel({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return <span className={`font-pixel leading-[1.7] text-brand ${className}`}>{children}</span>;
@@ -168,7 +168,14 @@ export default function HomeHero({
         </div>
 
         {/* Right 1/3 */}
-        <div className="relative">
+        <div className="flex flex-col gap-6">
+          {/* Invisible spacer matching the left column's "Start From Here!" row,
+              so the Startup Profile card top lines up with the orange boxes. */}
+          <div className="invisible flex items-center gap-2" aria-hidden>
+            <Pixel className="text-lg sm:text-xl">Start From Here!</Pixel>
+            <span className="text-xl">↓</span>
+          </div>
+          <div className="relative">
           <div className="flex flex-col gap-4 rounded-2xl border border-navy/10 p-5">
             <div className="flex items-center gap-2">
               <Pixel className="text-base sm:text-lg">Startup Profile</Pixel>
@@ -227,6 +234,7 @@ export default function HomeHero({
           {fileLibOpen && (
             <FileLibraryPanel companyId={active.id} onClose={() => setFileLibOpen(false)} />
           )}
+          </div>
         </div>
       </div>
 

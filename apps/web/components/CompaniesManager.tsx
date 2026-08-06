@@ -10,7 +10,8 @@ interface Company {
   fundingCurrency?: string | null; valuation?: string | null; roundSize?: string | null;
   topic?: string | null; profile?: Record<string, string> | null;
 }
-const STAGES = ["pre_seed", "seed", "A"];
+const STAGES = ["pre_seed", "angel", "seed", "A"];
+const STAGE_LABEL: Record<string, string> = { pre_seed: "Pre-seed", angel: "Angel", seed: "Seed", A: "Series A" };
 const blank = {
   name: "", topic: "", docText: "", bpFileName: "", stage: "seed",
   fundingCurrency: "USD", valuation: "", roundSize: "", profile: {} as Record<string, string>,
@@ -125,7 +126,7 @@ function Editor({ form, setForm, onSave, onCancel, onUpload, busy, error, isNew 
       </label>
       <div className="flex flex-wrap gap-2">
         <select value={form.stage} onChange={set("stage")} className="rounded-lg border border-line bg-ink p-2 text-sm text-white">
-          {STAGES.map((s) => <option key={s} value={s}>{s === "A" ? "Series A" : s}</option>)}
+          {STAGES.map((s) => <option key={s} value={s}>{STAGE_LABEL[s] ?? s}</option>)}
         </select>
         <input value={form.fundingCurrency ?? ""} onChange={set("fundingCurrency")} placeholder="Currency" className="w-24 rounded-lg border border-line bg-ink p-2 text-sm text-white outline-none focus:border-accent" />
         <input value={form.valuation ?? ""} onChange={set("valuation")} placeholder="Valuation" className="w-32 rounded-lg border border-line bg-ink p-2 text-sm text-white outline-none focus:border-accent" />

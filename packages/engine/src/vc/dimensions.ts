@@ -31,6 +31,7 @@ export const RISK_AXIS_LABELS: Record<RiskAxis, string> = {
 /** §0.3 stage weights, sum = 100 per column. */
 export const STAGE_WEIGHTS: Record<Stage, Record<Dimension, number>> = {
   pre_seed: { team: 35, market: 30, product: 15, traction: 5, moat: 10, business_model: 5 },
+  angel: { team: 35, market: 30, product: 15, traction: 5, moat: 10, business_model: 5 },
   seed: { team: 25, market: 25, product: 20, traction: 15, moat: 10, business_model: 5 },
   A: { team: 15, market: 20, product: 15, traction: 25, moat: 10, business_model: 15 },
 };

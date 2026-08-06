@@ -15,7 +15,7 @@ export const companyInputSchema = z.object({
   fundingCurrency: z.string().optional(),
   valuation: z.string().optional(),
   roundSize: z.string().optional(),
-  stage: z.enum(["pre_seed", "seed", "A"]).optional(),
+  stage: z.enum(["pre_seed", "angel", "seed", "A"]).optional(),
   profile: profileSchema.optional(),
   // Pre-extracted files from the onboarding chat → become Document rows.
   documents: z.array(documentInputSchema).optional(),

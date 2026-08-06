@@ -8,7 +8,7 @@ export type Dimension =
 
 export type RiskAxis = "capital" | "team" | "market" | "growth" | "product";
 
-export type Stage = "pre_seed" | "seed" | "A";
+export type Stage = "pre_seed" | "angel" | "seed" | "A";
 export type Mode = "screening" | "ic" | "board" | "tea";
 
 export type ProviderName = "qwen" | "deepseek";
