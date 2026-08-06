@@ -153,7 +153,10 @@ export default function HomeHero({
 
           <div className="border-t border-navy/10" />
 
-          <Pixel className="text-lg sm:text-xl">History Meetings</Pixel>
+          <div className="flex flex-col gap-1">
+            <Pixel className="text-lg sm:text-xl">History Meetings</Pixel>
+            <p className="text-xs text-navy/40">Deleted meetings can be restored from Settings, kept for up to 30 days.</p>
+          </div>
 
           {list.length === 0 ? (
             <p className="text-sm text-navy/50">No meetings yet — start one above.</p>
