@@ -11,18 +11,18 @@ describe("findDuplicates", () => {
 });
 
 describe("validateParticipants", () => {
-  it("rejects fewer than 2", () => {
-    expect(validateParticipants(["a"])).toMatchObject({ ok: false });
+  it("rejects fewer than 4", () => {
+    expect(validateParticipants(["a", "b", "c"])).toMatchObject({ ok: false });
   });
   it("rejects more than 6", () => {
     expect(validateParticipants(["a", "b", "c", "d", "e", "f", "g"])).toMatchObject({ ok: false });
   });
   it("rejects duplicate personas", () => {
-    const r = validateParticipants(["a", "a", "b"]);
+    const r = validateParticipants(["a", "a", "b", "c"]);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toContain("Duplicate");
   });
   it("accepts a valid unique panel", () => {
-    expect(validateParticipants(["a", "b", "c"])).toEqual({ ok: true });
+    expect(validateParticipants(["a", "b", "c", "d"])).toEqual({ ok: true });
   });
 });

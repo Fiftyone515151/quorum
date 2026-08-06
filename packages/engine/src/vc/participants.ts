@@ -1,7 +1,7 @@
 // Panel selection validation. Standalone + pure so it's unit-testable and
 // reusable between the API route and any future callers.
 
-export const MIN_PANELISTS = 2;
+export const MIN_PANELISTS = 4;
 export const MAX_PANELISTS = 6;
 
 /** Return the set of ids that appear more than once, in first-seen order. */

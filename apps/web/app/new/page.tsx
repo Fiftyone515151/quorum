@@ -1,54 +1,119 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import AppShell from "@/components/AppShell";
+
+// Mirror of the engine constants (importing @quorum/engine here would pull
+// server-only deps into the client bundle). The server still enforces the
+// authoritative values in POST /api/runs.
+const MIN_PANELISTS = 4;
+const MAX_PANELISTS = 6;
 
 interface PersonaDTO {
-  id: string; name: string; avatar?: string; seat: string;
-  dimensions: string[]; stance: string; reasoning: string; identity: string | null; firm: string | null; isStar: boolean;
+  id: string; name: string; avatar?: string; seat: string; stance: string; firm: string | null; isStar: boolean;
 }
-interface Company { id: string; name: string; stage: string }
+interface Company { id: string; name: string; stage: string; topic: string | null }
 type Mode = "screening" | "ic" | "board" | "tea";
-const MODE_LABEL: Record<Mode, string> = { screening: "🎯 Screening", ic: "⚖️ Investment Committee", board: "🛠️ Board", tea: "🍵 Founder Tea" };
+
+const MODE_LABEL: Record<Mode, string> = {
+  screening: "Screening", ic: "Investment Committee", board: "Board", tea: "Founder Tea",
+};
+const STAGE_LABEL: Record<string, string> = { pre_seed: "Pre-seed", angel: "Angel", seed: "Seed", A: "Series A" };
+
+function Pixel({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <span className={`font-pixel leading-[1.7] text-brand ${className}`}>{children}</span>;
+}
+
+function PersonaCard({ p, selected, onToggle }: { p: PersonaDTO; selected: boolean; onToggle: () => void }) {
+  return (
+    <button
+      onClick={onToggle}
+      className={`flex w-28 shrink-0 flex-col items-center gap-2 rounded-xl border-2 p-2 text-center transition ${selected ? "border-brand bg-brand-tint" : "border-transparent hover:bg-navy/5"}`}
+    >
+      <div className="flex h-14 w-14 items-center justify-center rounded-full border border-brand/30 bg-white text-2xl shadow-sm">
+        {p.avatar ?? "🧠"}
+      </div>
+      <span className="text-xs font-medium leading-tight text-navy/85">{p.name}</span>
+      <span className="text-[10px] leading-tight text-navy/45">
+        {p.isStar ? `in the style of · ${p.firm ?? ""}` : `${p.seat} · ${p.stance}`}
+      </span>
+    </button>
+  );
+}
 
 function NewSessionInner() {
   const router = useRouter();
   const params = useSearchParams();
-  const mode = (params.get("mode") as Mode) || "screening";
+  const mode = ((params.get("mode") as Mode) || "screening") as Mode;
+  const storeKey = `quorum:new:${mode}`;
 
   const [companies, setCompanies] = useState<Company[]>([]);
   const [companyId, setCompanyId] = useState("");
   const [pool, setPool] = useState<{ defaults: PersonaDTO[]; stars: PersonaDTO[] } | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
+  const [docs, setDocs] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [restored, setRestored] = useState(false);
 
+  // Load companies + personas; restore any saved draft for this mode.
   useEffect(() => {
+    let saved: { companyId?: string; selected?: string[] } = {};
+    try { saved = JSON.parse(sessionStorage.getItem(storeKey) || "{}"); } catch { /* ignore */ }
+    const cookieCompany = document.cookie.split("; ").find((c) => c.startsWith("quorum_active_company="))?.split("=")[1];
+
     fetch("/api/companies").then((r) => r.json()).then((d) => {
-      setCompanies(d.companies ?? []);
-      if (d.companies?.[0]) setCompanyId(d.companies[0].id);
+      const list: Company[] = d.companies ?? [];
+      setCompanies(list);
+      const pick = (saved.companyId && list.some((c) => c.id === saved.companyId) && saved.companyId)
+        || (cookieCompany && list.some((c) => c.id === cookieCompany) && cookieCompany)
+        || list[0]?.id || "";
+      setCompanyId(pick);
     });
-    fetch("/api/personas").then((r) => r.json()).then((d) => {
+    fetch("/api/personas").then((r) => r.json()).then((d: { defaults: PersonaDTO[]; stars: PersonaDTO[] }) => {
       setPool(d);
-      setSelected(d.defaults.slice(0, 5).map((p: PersonaDTO) => p.id));
+      const all = [...d.defaults, ...d.stars];
+      const restore = (saved.selected ?? []).filter((id) => all.some((p) => p.id === id));
+      setSelected(restore.length ? restore : d.defaults.slice(0, 5).map((p) => p.id));
+      setRestored(true);
     });
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeKey]);
 
-  const rosterError = useMemo(() => {
-    if (selected.length < 2) return "Pick at least 2 roles.";
-    if (selected.length > 6) return "At most 6 roles.";
-    return null;
-  }, [selected]);
+  // Persist the draft once we've restored (so we don't overwrite it on first render).
+  useEffect(() => {
+    if (!restored) return;
+    sessionStorage.setItem(storeKey, JSON.stringify({ companyId, selected }));
+  }, [companyId, selected, restored, storeKey]);
 
-  function toggle(id: string) {
-    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : s.length < 6 ? [...s, id] : s));
+  // Fetch the selected company's documents for the preview.
+  useEffect(() => {
+    if (!companyId) { setDocs([]); return; }
+    fetch(`/api/documents?companyId=${companyId}`).then((r) => r.json())
+      .then((d) => setDocs((d.documents ?? []).map((x: any) => x.fileName))).catch(() => setDocs([]));
+  }, [companyId]);
+
+  const company = useMemo(() => companies.find((c) => c.id === companyId) ?? null, [companies, companyId]);
+
+  function selectCompany(id: string) {
+    setCompanyId(id);
+    document.cookie = `quorum_active_company=${id}; path=/; max-age=${60 * 60 * 24 * 365}`;
   }
 
-  async function create() {
-    setError(null);
-    if (!companyId) return setError("Select a startup.");
-    if (rosterError) return setError(rosterError);
+  function toggle(id: string) {
+    setNotice(null);
+    setSelected((s) => {
+      if (s.includes(id)) return s.filter((x) => x !== id);
+      if (s.length >= MAX_PANELISTS) { setNotice(`At most ${MAX_PANELISTS} investors.`); return s; }
+      return [...s, id];
+    });
+  }
+
+  async function convene() {
+    setNotice(null);
+    if (!companyId) return setNotice("Select a startup first.");
+    if (selected.length < MIN_PANELISTS) return setNotice(`Pick at least ${MIN_PANELISTS} investors to start.`);
     setBusy(true);
     try {
       const res = await fetch("/api/runs", {
@@ -58,62 +123,97 @@ function NewSessionInner() {
       const d = await res.json();
       if (!res.ok) throw new Error(typeof d.error === "string" ? d.error : "Failed to create");
       await fetch(`/api/runs/${d.runId}/start`, { method: "POST" });
+      sessionStorage.removeItem(storeKey);
       router.push(`/session/${d.runId}`);
-    } catch (e: any) { setError(e.message); setBusy(false); }
+    } catch (e: any) { setNotice(e.message); setBusy(false); }
   }
 
-  const card = (p: PersonaDTO) => (
-    <button key={p.id} onClick={() => toggle(p.id)}
-      className={`card p-3 text-left transition ${selected.includes(p.id) ? "border-accent ring-1 ring-accent" : "hover:border-muted"}`}>
-      <div className="flex items-center gap-2 text-white"><span>{p.avatar ?? "🧠"}</span><span className="text-sm font-medium">{p.name}</span>
-        <span className={`label ml-auto ${p.stance === "skeptic" ? "text-brass" : p.stance === "optimist" ? "text-accent" : ""}`}>{p.stance}</span></div>
-      {p.firm && <div className="mt-0.5 text-xs italic text-muted">In the style of · {p.firm}</div>}
-      <div className="mt-1 text-xs text-muted">{p.seat} · {p.dimensions.join("/") || "generalist"}</div>
-    </button>
-  );
-
   return (
-    <div className="flex flex-col gap-8">
-      <h1 className="text-2xl font-semibold text-white">New session · <span className="text-accent">{MODE_LABEL[mode]}</span></h1>
+    <div className="min-h-screen bg-white font-sans text-navy">
+      {/* Top bar */}
+      <div className="mx-auto flex max-w-5xl items-center px-6 py-3">
+        <img src="/brand/lockup.png" alt="Quorum" className="h-9 w-auto sm:h-12" />
+        <Link href="/" aria-label="Exit" className="ml-auto flex h-9 w-9 items-center justify-center rounded-lg text-navy/50 transition hover:bg-navy/5 hover:text-navy">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="m13 6 6 6-6 6" /></svg>
+        </Link>
+      </div>
+      <div className="border-b border-navy/10" />
 
-      <section className="flex flex-col gap-3">
-        <p className="label">1 · Which startup</p>
+      <div className="mx-auto flex max-w-5xl flex-col gap-8 px-6 py-8">
+        <h1 className="text-center"><Pixel className="text-xl sm:text-2xl">New Session: {MODE_LABEL[mode]}</Pixel></h1>
+
+        {/* Company */}
         {companies.length === 0 ? (
-          <p className="text-sm text-brass">No startups yet — add one on the home page first.</p>
+          <p className="text-center text-sm text-navy/60">
+            No startup yet — <Link href="/onboarding?add=1" className="text-brand underline">add one first</Link>.
+          </p>
         ) : (
-          <select value={companyId} onChange={(e) => setCompanyId(e.target.value)} className="max-w-sm rounded-lg border border-line bg-ink p-3 text-sm text-white">
-            {companies.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.stage})</option>)}
-          </select>
-        )}
-      </section>
+          <section className="flex flex-col gap-3">
+            <select value={companyId} onChange={(e) => selectCompany(e.target.value)}
+              className="max-w-sm rounded-lg border border-navy/15 bg-white p-3 text-sm text-navy outline-none focus:border-brand">
+              {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
 
-      <section className="flex flex-col gap-3">
-        <p className="label">2 · Panel · {selected.length}/6</p>
-        {pool && (
-          <>
-            <p className="text-xs text-muted">Default pool</p>
-            <div className="grid gap-2 sm:grid-cols-2">{pool.defaults.map(card)}</div>
-            <p className="mt-2 text-xs text-muted">Star investor archetypes</p>
-            <div className="grid gap-2 sm:grid-cols-2">{pool.stars.map(card)}</div>
-          </>
+            {company && (
+              <div className="relative rounded-2xl border border-brand/60 p-5">
+                <dl className="flex flex-col gap-2 text-sm">
+                  <div className="flex gap-2"><dt className="w-16 shrink-0 font-semibold text-navy/60">Name</dt><dd className="text-navy/90">{company.name}</dd></div>
+                  <div className="flex gap-2"><dt className="w-16 shrink-0 font-semibold text-navy/60">Stage</dt><dd className="text-navy/90">{STAGE_LABEL[company.stage] ?? company.stage}</dd></div>
+                  <div className="flex gap-2"><dt className="w-16 shrink-0 font-semibold text-navy/60">Topic</dt><dd className="text-navy/90">{company.topic || "—"}</dd></div>
+                  <div className="flex gap-2"><dt className="w-16 shrink-0 font-semibold text-navy/60">Files</dt><dd className="text-navy/90">{docs.length ? docs.join(", ") : "—"}</dd></div>
+                </dl>
+                <Link href={`/profile?return=new&mode=${mode}`}
+                  className="mt-3 block text-right text-sm font-medium text-brand underline underline-offset-2 hover:text-brand-dark">
+                  Edit Startup info
+                </Link>
+              </div>
+            )}
+          </section>
         )}
-        {rosterError && <p className="text-xs text-brass">{rosterError}</p>}
-      </section>
 
-      {error && <p className="text-sm text-brass">{error}</p>}
-      <button onClick={create} disabled={busy || companies.length === 0} className="btn-primary self-start">
-        {busy ? "Convening…" : "Convene the panel"}
-      </button>
+        {/* Panel selection */}
+        {pool && companies.length > 0 && (
+          <section className="flex flex-col gap-5">
+            <Pixel className="text-sm sm:text-base">Pick {MIN_PANELISTS}–{MAX_PANELISTS} investors from the Persona Library and Star Investors below.</Pixel>
+
+            <div className="flex flex-col gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-navy/50">Persona Library</p>
+              <div className="flex flex-wrap gap-3">
+                {pool.defaults.map((p) => <PersonaCard key={p.id} p={p} selected={selected.includes(p.id)} onToggle={() => toggle(p.id)} />)}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-navy/50">Star Investors</p>
+              <div className="flex flex-wrap gap-3">
+                {pool.stars.map((p) => <PersonaCard key={p.id} p={p} selected={selected.includes(p.id)} onToggle={() => toggle(p.id)} />)}
+              </div>
+            </div>
+
+            <p className="text-sm text-navy/50">Selected {selected.length}/{MAX_PANELISTS}</p>
+          </section>
+        )}
+
+        {/* Convene */}
+        {companies.length > 0 && (
+          <section className="flex flex-col items-center gap-3">
+            <Pixel className="text-sm sm:text-base">Happy with your picks? Start below!</Pixel>
+            {notice && <p className="text-sm font-medium text-brand-dark">{notice}</p>}
+            <button onClick={convene} disabled={busy}
+              className="rounded-lg bg-brand px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-dark disabled:opacity-50">
+              {busy ? "Convening…" : "Convene the panel"}
+            </button>
+          </section>
+        )}
+      </div>
     </div>
   );
 }
 
 export default function NewSessionPage() {
   return (
-    <AppShell>
-      <Suspense fallback={<p className="text-muted">Loading…</p>}>
-        <NewSessionInner />
-      </Suspense>
-    </AppShell>
+    <Suspense fallback={<p className="p-6 text-navy/50">Loading…</p>}>
+      <NewSessionInner />
+    </Suspense>
   );
 }
