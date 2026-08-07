@@ -13,15 +13,20 @@ type RoundView = { code: string; label: string; turns: TurnView[]; notices: stri
 
 interface RunData {
   id: string; mode: string; status: string; stage: string; createdAt: string; updatedAt: string;
-  companySnapshot: { name: string; stage: string; valuation?: string; roundSize?: string };
+  companySnapshot: {
+    name: string; stage: string; topic?: string; valuation?: string; roundSize?: string;
+    profile?: Record<string, string>; documentNames?: string[];
+  };
   roles: { persona: { id: string; name: string; avatar?: string } }[];
   result: any;
 }
+interface ThreadRun { id: string; mode: string; status: string; createdAt: string; result: any; parentRunId: string | null }
 
 const MODE_LABEL: Record<string, string> = {
   screening: "Screening", ic: "Investment Committee", board: "Board", tea: "Founder Tea",
 };
 const MODE_ICON: Record<string, string> = { screening: "🎯", ic: "⚖️", board: "🛠️", tea: "🍵" };
+const STAGE_LABEL: Record<string, string> = { pre_seed: "Pre-seed", angel: "Angel", seed: "Seed", A: "Series A" };
 const INTERACTIVE = new Set(["board", "tea"]);
 
 function upsertRound(rounds: RoundView[], code: string, label?: string): RoundView[] {
@@ -175,9 +180,77 @@ function ExportMenu({ runId }: { runId: string }) {
   );
 }
 
+function ResultForMode({ mode, r }: { mode: string; r: any }) {
+  if (!r) return null;
+  return (
+    <div className="mt-3 rounded-xl border border-brand/30 bg-white p-4">
+      {mode === "screening" && <ScreeningPanel r={r} />}
+      {mode === "ic" && <ICPanel r={r} />}
+      {mode === "board" && <BoardPanel r={r} />}
+      {mode === "tea" && <TeaPanel r={r} />}
+    </div>
+  );
+}
+
+// Frozen startup profile as the panel saw it at run time.
+function ProfileSnapshot({ snap }: { snap: RunData["companySnapshot"] }) {
+  const files = snap.documentNames?.length ? snap.documentNames.join(", ") : "—";
+  const row = (label: string, value: string) => (
+    <div className="flex gap-3"><dt className="w-16 shrink-0 font-semibold text-navy/55">{label}</dt><dd className="min-w-0 break-words text-navy/90">{value}</dd></div>
+  );
+  return (
+    <div className="mx-auto w-full max-w-2xl rounded-2xl border border-brand/60 p-5">
+      <dl className="flex flex-col gap-2 text-sm">
+        {row("Name", snap.name)}
+        {row("Stage", STAGE_LABEL[snap.stage] ?? snap.stage)}
+        {row("Topic", snap.topic || "—")}
+        {row("Files", files)}
+      </dl>
+    </div>
+  );
+}
+
+// A collapsible earlier round in the same continuation thread.
+function PriorRound({ runObj }: { runObj: ThreadRun }) {
+  const [open, setOpen] = useState(false);
+  const [rounds, setRounds] = useState<RoundView[] | null>(null);
+  useEffect(() => {
+    if (!open || rounds !== null) return;
+    fetch(`/api/runs/${runObj.id}/events?after=0`).then((r) => r.json())
+      .then((d) => setRounds(replayRounds(d.events ?? []).rounds)).catch(() => setRounds([]));
+  }, [open, rounds, runObj.id]);
+  const date = new Date(runObj.createdAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+  return (
+    <section className="rounded-2xl border border-brand/40 bg-brand-tint/20">
+      <button onClick={() => setOpen((v) => !v)} className="flex w-full items-center gap-2 px-4 py-3 text-left">
+        <span className="text-brand">{open ? "▾" : "▸"}</span>
+        <Pixel className="text-[10px] sm:text-xs">{MODE_LABEL[runObj.mode] ?? runObj.mode}</Pixel>
+        <span className="text-xs text-navy/45">{date}</span>
+        <span className="ml-auto text-xs font-medium text-navy/45">Previous round</span>
+      </button>
+      {open && (
+        <div className="flex flex-col gap-5 px-4 pb-5">
+          {rounds === null ? (
+            <p className="text-sm text-navy/40">Loading…</p>
+          ) : (
+            rounds.map((round) => (
+              <div key={round.code} className="flex flex-col gap-4 rounded-xl border border-brand/20 p-4">
+                <Pixel className="text-[10px]">{round.label.toUpperCase()}</Pixel>
+                {round.turns.map((turn) => <TurnBubble key={turn.id} turn={turn} />)}
+              </div>
+            ))
+          )}
+          <ResultForMode mode={runObj.mode} r={runObj.result} />
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function SessionClient({ id }: { id: string }) {
   const router = useRouter();
   const [run, setRun] = useState<RunData | null>(null);
+  const [priorRuns, setPriorRuns] = useState<ThreadRun[]>([]);
   const [rounds, setRounds] = useState<RoundView[]>([]);
   const [result, setResult] = useState<any>(null);
   const [status, setStatus] = useState("running");
@@ -269,6 +342,10 @@ export default function SessionClient({ id }: { id: string }) {
       const data = await fetch(`/api/runs/${id}`).then((response) => response.json()).catch(() => null);
       if (closed || !data?.run) return;
       setRun(data.run); mode.current = data.run.mode; setStatus(data.run.status); setResult(data.run.result ?? null);
+      // Earlier rounds in this continuation thread (everything before this run).
+      const thread: ThreadRun[] = data.threadRuns ?? [];
+      const idx = thread.findIndex((r) => r.id === id);
+      setPriorRuns(idx > 0 ? thread.slice(0, idx) : []);
 
       let maxSeq = 0;
       try {
@@ -393,8 +470,17 @@ export default function SessionClient({ id }: { id: string }) {
       <main className="mx-auto flex w-[80%] max-w-6xl flex-col gap-8 py-8 max-md:w-full max-md:px-4">
         <div className="text-center">
           <h1><Pixel className="text-lg sm:text-2xl">{run?.companySnapshot?.name || "Convening the panel…"}</Pixel></h1>
-          <p className="mt-2 text-sm text-navy/45">{run?.companySnapshot?.stage} {date && `· ${date}`}</p>
+          <p className="mt-2 text-sm text-navy/45">{STAGE_LABEL[run?.companySnapshot?.stage ?? ""] ?? run?.companySnapshot?.stage} {date && `· ${date}`}</p>
         </div>
+
+        {run && <ProfileSnapshot snap={run.companySnapshot} />}
+
+        {priorRuns.length > 0 && (
+          <div className="flex flex-col gap-3">
+            {priorRuns.map((r) => <PriorRound key={r.id} runObj={r} />)}
+            <p className="text-center text-xs font-medium text-navy/40">↓ This round continues below</p>
+          </div>
+        )}
 
         {(starts.current.length > 0 || active.current) && (
           <button onClick={() => setShowAll(true)} disabled={showAll} className="self-end text-xs font-medium text-navy/40 underline underline-offset-2 hover:text-brand disabled:hidden">Show all</button>
@@ -429,11 +515,20 @@ export default function SessionClient({ id }: { id: string }) {
           </section>
         )}
 
-        {(status === "done" || status === "failed") && (
-          <div className="flex flex-wrap items-center gap-3 border-t border-navy/10 pt-5">
-            <span className="text-xs font-semibold text-emerald-600">✓ Result saved</span>
-            <button onClick={deleteRun} className="ml-auto rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50">Delete session</button>
-            <Link href="/" className="rounded-lg bg-brand px-5 py-2 text-sm font-semibold text-white hover:bg-brand-dark">Save &amp; back to home</Link>
+        {(status === "done" || status === "failed") && run && (
+          <div className="flex flex-col gap-4 border-t border-navy/10 pt-5">
+            {/* Not satisfied? Reconvene, building on this round. */}
+            <button
+              onClick={() => router.push(`/new?mode=${run.mode}&from=${id}`)}
+              className="self-start rounded-lg border-2 border-brand px-5 py-2.5 text-sm font-semibold text-brand transition hover:bg-brand hover:text-white"
+            >
+              Not satisfied with the result? Discuss again →
+            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-xs font-semibold text-emerald-600">✓ Result saved</span>
+              <button onClick={deleteRun} className="ml-auto rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50">Delete session</button>
+              <Link href="/" className="rounded-lg bg-brand px-5 py-2 text-sm font-semibold text-white hover:bg-brand-dark">Save &amp; back to home</Link>
+            </div>
           </div>
         )}
         <div ref={bottomRef} />
