@@ -43,6 +43,7 @@ async function loadContext(runId: string): Promise<RunContext> {
     include: {
       roles: { include: { persona: true }, orderBy: { order: "asc" } },
       inheritedFrom: true,
+      parent: { select: { mode: true, result: true } },
     },
   });
   if (!run) throw new Error(`ModeRun ${runId} not found`);
@@ -86,6 +87,9 @@ async function loadContext(runId: string): Promise<RunContext> {
     panel,
     inherited: inherited
       ? { crux: inherited.crux, byRole: inherited.by_role, willAdvance: undefined }
+      : undefined,
+    priorRound: run.parent?.result != null
+      ? { mode: run.parent.mode, result: run.parent.result }
       : undefined,
   };
 }

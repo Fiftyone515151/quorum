@@ -95,6 +95,14 @@ model ModeRun {
   inheritedFrom   ModeRun?  @relation("RunInheritance", fields: [inheritedFromId], references: [id], onDelete: SetNull)
   children        ModeRun[] @relation("RunInheritance")
 
+  // Continuable sessions (③): a thread of same-startup rounds that build on
+  // each other. threadId is shared across the chain; parentRunId links a
+  // follow-up to the round it continues.
+  threadId    String?
+  parentRunId String?
+  parent      ModeRun?  @relation("RunThread", fields: [parentRunId], references: [id], onDelete: SetNull)
+  followups   ModeRun[] @relation("RunThread")
+
   roles         RunRole[]
   turns         Turn[]
   events        RunEvent[]

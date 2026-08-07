@@ -116,7 +116,7 @@ export async function runScreening(ctx: RunContext, io: EngineIO): Promise<Scree
       const dimList = persona.dimensions.map((d) => DIMENSION_LABELS[d]).join("、") || "（无专属维度，可综合评一到两项）";
       const out = await generateStructured({
         provider: providerFor(i),
-        system: composeSystemPrompt(persona, "screening", ctx.company),
+        system: composeSystemPrompt(persona, "screening", ctx.company, ctx.priorRound),
         user: `Score independently (do not look at others' opinions). Score ONLY the dimensions you own: ${dimList}.
 Output JSON: {"scores":[{"dimension":"<one of: team|market|product|traction|moat|business_model>","score":1-10,"reason":"one-line rationale"}],"is_fatal":bool,"fatal_reason":"if fatal, explain else empty string","will_advance":bool}
 will_advance = whether you'd let it into the next round (low bar: willing to keep looking). Write prose in the language of the BP.`,
@@ -163,7 +163,7 @@ will_advance = whether you'd let it into the next round (low bar: willing to kee
         const turn = await startTurn(side.persona.id, side.persona.name, "S4", side.persona.avatar);
         const rb = await generateStructured({
           provider: providerFor(ctx.panel.indexOf(side.persona)),
-          system: composeSystemPrompt(side.persona, "screening", ctx.company),
+          system: composeSystemPrompt(side.persona, "screening", ctx.company, ctx.priorRound),
           user: `On the ${DIMENSION_LABELS[pt.d]} dimension, ${other.persona.name} scored ${otherScore?.score} — reason: "${otherScore?.reason}". Respond in <=60 words: hold or revise your judgment. Write in the language of the BP. Output JSON: {"rebuttal":"..."}`,
           schema: zScreeningRebuttal,
           maxTokens: 300,

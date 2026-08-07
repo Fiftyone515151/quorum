@@ -88,4 +88,9 @@ export interface RunContext {
     byRole?: Record<string, unknown>;
     willAdvance?: string[];
   };
+  /** Continuation (③): the round this session follows on from, if any. */
+  priorRound?: {
+    mode: Mode;
+    result: unknown;
+  };
 }

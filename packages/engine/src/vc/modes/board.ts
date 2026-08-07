@@ -78,7 +78,7 @@ export async function runBoard(ctx: RunContext, io: EngineIO): Promise<BoardResu
     const turn = await startTurn(persona.id, persona.name, "S1", persona.avatar);
     const out = await generateStructured({
       provider: providerFor(idx),
-      system: composeSystemPrompt(persona, "board", ctx.company),
+      system: composeSystemPrompt(persona, "board", ctx.company, ctx.priorRound),
       user: `As a board director, raise concrete improvement items ONLY within your risk axes: ${axesList}.
 ${founderContext.length ? `Founder context from this meeting:\n${founderContext.map((x) => `- ${x}`).join("\n")}\n` : ""}
 Output JSON: {"items":[{"suggestion":"concrete action","axis":"<one of: capital|team|market|growth|product>","severity":1-5}]}

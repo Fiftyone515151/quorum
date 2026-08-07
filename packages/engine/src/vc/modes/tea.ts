@@ -85,7 +85,7 @@ export async function runTea(ctx: RunContext, io: EngineIO): Promise<TeaResult> 
     const personaTurn = await startTurn(persona.id, persona.name, "S2", persona.avatar);
     const out = await generateStructured({
       provider: providerFor(ctx.panel.indexOf(persona)),
-      system: composeSystemPrompt(persona, "tea", ctx.company),
+      system: composeSystemPrompt(persona, "tea", ctx.company, ctx.priorRound),
       user: `Open discussion (you may build on others, riff, or digress). React to the recent talk in 1-3 sentences — surface an angle, don't conclude.\nRecent:\n${recent}\nOutput JSON: {"content":"..."}`,
       schema: zTeaTurn, maxTokens: 300,
     });
