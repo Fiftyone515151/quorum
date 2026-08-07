@@ -91,7 +91,13 @@ export function decideScreeningOutcome(input: {
 /** §6.1 state machine. */
 export async function runScreening(ctx: RunContext, io: EngineIO): Promise<ScreeningResult> {
   let seq = 0;
-  const emitTurn = async (
+  const startTurn = async (actor: string, actorName: string, segment: string, avatar?: string) => {
+    const turn = { id: randomUUID(), actor, actorName, avatar, segment, turnOrder: seq++ };
+    await io.emit({ type: "turn.start", ...turn, seq: turn.turnOrder });
+    return turn;
+  };
+  const completeTurn = async (
+    turn: Awaited<ReturnType<typeof startTurn>>,
     actor: string,
     actorName: string,
     segment: string,
@@ -99,14 +105,14 @@ export async function runScreening(ctx: RunContext, io: EngineIO): Promise<Scree
     fields?: unknown,
     avatar?: string
   ) => {
-    const id = randomUUID();
-    await io.emit({ type: "turn.completed", id, actor, actorName, avatar, segment, seq: seq++, content, fields });
+    await io.emit({ type: "turn.completed", ...turn, actor, actorName, avatar, segment, seq: turn.turnOrder, turnOrder: turn.turnOrder, content, fields });
   };
 
   // S1 · independent scoring (parallel, back-to-back)
   await io.emit({ type: "segment", segment: "S1", label: "S1 · Independent scoring" });
   const scored: RoleScored[] = await Promise.all(
     ctx.panel.map(async (persona, i) => {
+      const turn = await startTurn(persona.id, persona.name, "S1", persona.avatar);
       const dimList = persona.dimensions.map((d) => DIMENSION_LABELS[d]).join("、") || "（无专属维度，可综合评一到两项）";
       const out = await generateStructured({
         provider: providerFor(i),
@@ -123,7 +129,7 @@ will_advance = whether you'd let it into the next round (low bar: willing to kee
         out.scores.map((s) => `${DIMENSION_LABELS[s.dimension as Dimension] ?? s.dimension}: ${s.score} — ${s.reason}`).join("\n") +
         (out.is_fatal ? `\n⚠️ Fatal: ${out.fatal_reason}` : "") +
         `\nAdvance: ${out.will_advance ? "yes" : "no"}`;
-      await emitTurn(persona.id, persona.name, "S1", summary, out, persona.avatar);
+      await completeTurn(turn, persona.id, persona.name, "S1", summary, out, persona.avatar);
       return { persona, out, perRoleMean };
     })
   );
@@ -154,6 +160,7 @@ will_advance = whether you'd let it into the next round (low bar: willing to kee
       for (const side of [pt.hi, pt.lo]) {
         const other = side === pt.hi ? pt.lo : pt.hi;
         const otherScore = other.out.scores.find((x) => x.dimension === pt.d);
+        const turn = await startTurn(side.persona.id, side.persona.name, "S4", side.persona.avatar);
         const rb = await generateStructured({
           provider: providerFor(ctx.panel.indexOf(side.persona)),
           system: composeSystemPrompt(side.persona, "screening", ctx.company),
@@ -161,7 +168,7 @@ will_advance = whether you'd let it into the next round (low bar: willing to kee
           schema: zScreeningRebuttal,
           maxTokens: 300,
         });
-        await emitTurn(side.persona.id, side.persona.name, "S4", rb.rebuttal, { dimension: pt.d }, side.persona.avatar);
+        await completeTurn(turn, side.persona.id, side.persona.name, "S4", rb.rebuttal, { dimension: pt.d }, side.persona.avatar);
       }
     }
   }
@@ -171,6 +178,7 @@ will_advance = whether you'd let it into the next round (low bar: willing to kee
   const transcript = scored
     .map((r) => `${r.persona.name}：${r.out.scores.map((s) => `${s.dimension} ${s.score}`).join(", ")}${r.out.is_fatal ? ` [致命:${r.out.fatal_reason}]` : ""}`)
     .join("\n");
+  const hostTurn = await startTurn("host", "Chair", "S5", "🎙️");
   const cruxOut = await generateStructured({
     provider: "deepseek",
     system: `You are the screening Chair (host): neutral, you don't score and don't decide. Read the scores and disagreements, then do exactly two things: distill the 2-3 crux questions that MUST be answered to advance, plus a one-line divergence summary. ${languageDirective(ctx.company)}`,
@@ -178,7 +186,7 @@ will_advance = whether you'd let it into the next round (low bar: willing to kee
     schema: zScreeningCrux,
     maxTokens: 500,
   });
-  await emitTurn("host", "Chair", "S5", `Crux (must answer):\n- ${cruxOut.crux.join("\n- ")}\n\nDivergence: ${cruxOut.divergence_summary}`, cruxOut);
+  await completeTurn(hostTurn, "host", "Chair", "S5", `Crux (must answer):\n- ${cruxOut.crux.join("\n- ")}\n\nDivergence: ${cruxOut.divergence_summary}`, cruxOut, "🎙️");
 
   // S6 · decide (code)
   const result = decideScreeningOutcome({ stage: ctx.stage, scored, crux: cruxOut.crux });

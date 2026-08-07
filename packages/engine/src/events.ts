@@ -12,6 +12,7 @@ export type RunEvent =
       avatar?: string;
       segment: string;
       seq: number;
+      turnOrder?: number;
     }
   | { type: "turn.delta"; id: string; delta: string }
   | {
@@ -22,6 +23,7 @@ export type RunEvent =
       avatar?: string;
       segment: string;
       seq: number;
+      turnOrder?: number;
       content: string;
       fields?: unknown;
     }
@@ -37,4 +39,6 @@ export interface EngineIO {
   waitForFounder?: (kind: string, payload: unknown) => Promise<any>;
   /** Non-blocking: return + clear any founder messages waiting (Founder Tea interjections). */
   drainInterjections?: () => Promise<{ content: string }[]>;
+  /** Pause at a safe turn boundary when the founder opens the interjection composer. */
+  waitIfPaused?: () => Promise<{ content: string }[]>;
 }
