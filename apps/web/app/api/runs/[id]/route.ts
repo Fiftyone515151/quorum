@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@quorum/db";
 import { getSession } from "@/lib/auth";
 import { authorizeRun } from "@/lib/authorize";
+import { threadRunsWhere } from "@/lib/thread";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,17 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     })
   );
   if (!authz.ok) return NextResponse.json({ error: authz.error }, { status: authz.status });
-  return NextResponse.json({ run: authz.run });
+
+  // Sibling rounds in the same continuation thread (ordered), so the session
+  // view can render round 1 → 2 → 3. `id: threadId` also pulls in a legacy root
+  // whose own threadId is null (pre-feature runs continued from later).
+  const threadId = (authz.run as any).threadId ?? authz.run.id;
+  const threadRuns = await prisma.modeRun.findMany({
+    where: threadRunsWhere(threadId),
+    orderBy: { createdAt: "asc" },
+    select: { id: true, mode: true, status: true, createdAt: true, result: true, parentRunId: true },
+  });
+  return NextResponse.json({ run: authz.run, threadRuns });
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {

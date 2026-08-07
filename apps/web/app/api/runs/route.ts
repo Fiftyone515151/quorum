@@ -20,6 +20,8 @@ const bodySchema = z.object({
       message: "Duplicate panelists are not allowed.",
     }),
   inheritedFromId: z.string().optional(),
+  // Continuation (③): continue any prior run of the same company (any mode).
+  parentRunId: z.string().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -29,9 +31,25 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   const b = parsed.data;
 
-  const company = await prisma.company.findUnique({ where: { id: b.companyId } });
+  const company = await prisma.company.findUnique({
+    where: { id: b.companyId },
+    include: { documents: { select: { id: true, fileName: true }, orderBy: { createdAt: "asc" } } },
+  });
   if (!company || company.ownerId !== s.userId)
     return NextResponse.json({ error: "company not found" }, { status: 404 });
+
+  // Continuation: the parent run must belong to this user and the same company
+  // (any mode → any mode). The new run joins the parent's thread.
+  let threadId: string | undefined;
+  if (b.parentRunId) {
+    const parent = await prisma.modeRun.findUnique({
+      where: { id: b.parentRunId },
+      include: { company: { select: { ownerId: true } } },
+    });
+    if (!parent || parent.company.ownerId !== s.userId || parent.companyId !== b.companyId)
+      return NextResponse.json({ error: "parentRunId not found" }, { status: 404 });
+    threadId = parent.threadId ?? parent.id;
+  }
 
   // Inheritance: the upstream run must belong to this user (no cross-user leak)
   // and follow the only supported funnel, screening → IC.
@@ -59,6 +77,10 @@ export async function POST(req: NextRequest) {
     roundSize: company.roundSize,
     stage: company.stage,
     topic: company.topic,
+    // Freeze the structured profile + document list as seen at run time.
+    profile: company.profile ?? undefined,
+    documentIds: company.documents.map((d) => d.id),
+    documentNames: company.documents.map((d) => d.fileName),
   };
 
   const run = await prisma.modeRun.create({
@@ -68,9 +90,13 @@ export async function POST(req: NextRequest) {
       mode: b.mode as Mode,
       stage: company.stage,
       inheritedFromId: b.inheritedFromId,
+      parentRunId: b.parentRunId,
+      threadId,
       roles: { create: b.participants.map((personaId, i) => ({ personaId, order: i })) },
     },
   });
+  // Every run belongs to a thread; a fresh run is a thread of one (itself).
+  if (!threadId) await prisma.modeRun.update({ where: { id: run.id }, data: { threadId: run.id } });
   return NextResponse.json({ runId: run.id });
 }
 

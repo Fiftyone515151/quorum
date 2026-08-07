@@ -67,7 +67,7 @@ export async function runIC(ctx: RunContext, io: EngineIO): Promise<ICResult> {
       const turn = await startTurn(persona.id, persona.name, "S1", persona.avatar);
       const out = await generateStructured({
         provider: providerFor(idx),
-        system: composeSystemPrompt(persona, "ic", ctx.company),
+        system: composeSystemPrompt(persona, "ic", ctx.company, ctx.priorRound),
         user: `State your position on investing.${priorCrux}
 Output JSON: {"stance":"invest|pass|conditional","conviction":1-5,"will_champion":bool,"is_fatal":bool,"fatal_reason":"if a dealbreaker, explain else empty","reason":"one-line justification"}
 will_champion = are you willing to stake your name and make the case FOR investing. Write prose in the language of the BP.`,
@@ -98,7 +98,7 @@ will_champion = are you willing to stake your name and make the case FOR investi
   const championTurn = await startTurn(champion.persona.id, champion.persona.name, "S3", champion.persona.avatar);
   const championCase = await generateStructured({
     provider: providerFor(champion.idx),
-    system: composeSystemPrompt(champion.persona, "ic", ctx.company),
+    system: composeSystemPrompt(champion.persona, "ic", ctx.company, ctx.priorRound),
     user: `You are the CHAMPION. Make the strongest case FOR investing (3-5 sentences).${priorCrux} Output JSON: {"case_for":"..."}`,
     schema: zChampionCase, maxTokens: 600,
   });
@@ -117,7 +117,7 @@ will_champion = are you willing to stake your name and make the case FOR investi
   const dissentTurn = await startTurn(dissenter.persona.id, dissenter.persona.name, "S5", dissenter.persona.avatar);
   const dissent = await generateStructured({
     provider: providerFor(dissenter.idx),
-    system: composeSystemPrompt(dissenter.persona, "ic", ctx.company),
+    system: composeSystemPrompt(dissenter.persona, "ic", ctx.company, ctx.priorRound),
     user: `You are the DESIGNATED DISSENTER — your only job is to kill this deal. Make the strongest kill case (3-5 sentences) and name the single most dangerous flaw. Output JSON: {"kill_case":"...","candidate_fatal":"the one flaw most likely to be fatal"}`,
     schema: zDissentCase, maxTokens: 600,
   });
@@ -142,7 +142,7 @@ will_champion = are you willing to stake your name and make the case FOR investi
     const championRebuttalTurn = await startTurn(champion.persona.id, champion.persona.name, "S7", champion.persona.avatar);
     const champRb = await generateStructured({
       provider: providerFor(champion.idx),
-      system: composeSystemPrompt(champion.persona, "ic", ctx.company),
+      system: composeSystemPrompt(champion.persona, "ic", ctx.company, ctx.priorRound),
       user: `Defend against the dissent and resolve the crux: "${cruxText}". <=70 words, language of the BP. Output JSON: {"rebuttal":"..."}`,
       schema: zRebuttal, maxTokens: 300,
     });
@@ -150,7 +150,7 @@ will_champion = are you willing to stake your name and make the case FOR investi
     const dissenterRebuttalTurn = await startTurn(dissenter.persona.id, dissenter.persona.name, "S7", dissenter.persona.avatar);
     const disRb = await generateStructured({
       provider: providerFor(dissenter.idx),
-      system: composeSystemPrompt(dissenter.persona, "ic", ctx.company),
+      system: composeSystemPrompt(dissenter.persona, "ic", ctx.company, ctx.priorRound),
       user: `Rebut the champion. Is the crux "${cruxText}" actually resolved? <=70 words. Output JSON: {"rebuttal":"..."}`,
       schema: zRebuttal, maxTokens: 300,
     });

@@ -18,11 +18,16 @@ const MODE_CONTEXT: Record<Mode, string> = {
   tea: "This is FOUNDER TEA: no fixed goal, divergent, riff off each other. Offer clues only, never a conclusion.",
 };
 
+const MODE_NAME: Record<Mode, string> = {
+  screening: "Screening", ic: "Investment Committee", board: "Board", tea: "Founder Tea",
+};
+
 /** compose_system_prompt(persona, mode) — Persona Spec §7.2. */
 export function composeSystemPrompt(
   persona: ResolvedPersona,
   mode: Mode,
-  company: CompanyInput
+  company: CompanyInput,
+  priorRound?: { mode: Mode; result: unknown }
 ): string {
   const { seat, skin } = persona;
   const methodology = skin.methodology ?? seat.methodology;
@@ -56,6 +61,15 @@ export function composeSystemPrompt(
     `## Scene`,
     MODE_CONTEXT[mode],
     ``,
+    ...(priorRound
+      ? [
+          `## Prior round (this is a follow-up)`,
+          `This session continues a prior ${MODE_NAME[priorRound.mode]} round for the same startup; the founder has since updated their materials and reconvened.`,
+          `Prior outcome (JSON): ${truncate(JSON.stringify(priorRound.result ?? {}), 1500)}`,
+          `Weigh whether the updates change your judgment — build on the prior round, don't just repeat it.`,
+          ``,
+        ]
+      : []),
     `## Company under review`,
     `Name: ${company.name}`,
     `Stage: ${company.stage}`,

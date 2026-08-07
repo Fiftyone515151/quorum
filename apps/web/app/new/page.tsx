@@ -46,6 +46,7 @@ function NewSessionInner() {
   const router = useRouter();
   const params = useSearchParams();
   const mode = ((params.get("mode") as Mode) || "screening") as Mode;
+  const from = params.get("from"); // continue from a prior run (parentRunId)
   const storeKey = `quorum:new:${mode}`;
 
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -57,35 +58,51 @@ function NewSessionInner() {
   const [notice, setNotice] = useState<string | null>(null);
   const [restored, setRestored] = useState(false);
 
-  // Load companies + personas; restore any saved draft for this mode.
+  // Load companies + personas; restore a saved draft, or prefill from a parent
+  // run when continuing (?from=…).
   useEffect(() => {
     let saved: { companyId?: string; selected?: string[] } = {};
-    try { saved = JSON.parse(sessionStorage.getItem(storeKey) || "{}"); } catch { /* ignore */ }
+    if (!from) { try { saved = JSON.parse(sessionStorage.getItem(storeKey) || "{}"); } catch { /* ignore */ } }
     const cookieCompany = document.cookie.split("; ").find((c) => c.startsWith("quorum_active_company="))?.split("=")[1];
 
-    fetch("/api/companies").then((r) => r.json()).then((d) => {
-      const list: Company[] = d.companies ?? [];
+    const parentP = from
+      ? fetch(`/api/runs/${from}`).then((r) => r.json()).then((d) => d.run).catch(() => null)
+      : Promise.resolve(null);
+
+    Promise.all([
+      fetch("/api/companies").then((r) => r.json()),
+      fetch("/api/personas").then((r) => r.json()),
+      parentP,
+    ]).then(([cd, pd, parent]) => {
+      const list: Company[] = cd.companies ?? [];
       setCompanies(list);
-      const pick = (saved.companyId && list.some((c) => c.id === saved.companyId) && saved.companyId)
-        || (cookieCompany && list.some((c) => c.id === cookieCompany) && cookieCompany)
-        || list[0]?.id || "";
-      setCompanyId(pick);
-    });
-    fetch("/api/personas").then((r) => r.json()).then((d: { defaults: PersonaDTO[]; stars: PersonaDTO[] }) => {
-      setPool(d);
-      const all = [...d.defaults, ...d.stars];
-      const restore = (saved.selected ?? []).filter((id) => all.some((p) => p.id === id));
-      setSelected(restore.length ? restore : d.defaults.slice(0, 5).map((p) => p.id));
+      setPool(pd);
+      const all: PersonaDTO[] = [...(pd.defaults ?? []), ...(pd.stars ?? [])];
+
+      if (parent) {
+        // Continuation: lock to the parent's company, prefill its panel.
+        setCompanyId(parent.companyId);
+        const roleIds = (parent.roles ?? []).map((r: any) => r.persona?.id).filter(Boolean);
+        const restore = roleIds.filter((id: string) => all.some((p) => p.id === id));
+        setSelected(restore.length ? restore : pd.defaults.slice(0, 5).map((p: PersonaDTO) => p.id));
+      } else {
+        const pick = (saved.companyId && list.some((c) => c.id === saved.companyId) && saved.companyId)
+          || (cookieCompany && list.some((c) => c.id === cookieCompany) && cookieCompany)
+          || list[0]?.id || "";
+        setCompanyId(pick);
+        const restore = (saved.selected ?? []).filter((id) => all.some((p) => p.id === id));
+        setSelected(restore.length ? restore : (pd.defaults ?? []).slice(0, 5).map((p: PersonaDTO) => p.id));
+      }
       setRestored(true);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storeKey]);
+  }, [storeKey, from]);
 
-  // Persist the draft once we've restored (so we don't overwrite it on first render).
+  // Persist the draft (fresh sessions only — don't pollute the draft while continuing).
   useEffect(() => {
-    if (!restored) return;
+    if (!restored || from) return;
     sessionStorage.setItem(storeKey, JSON.stringify({ companyId, selected }));
-  }, [companyId, selected, restored, storeKey]);
+  }, [companyId, selected, restored, storeKey, from]);
 
   // Fetch the selected company's documents for the preview.
   useEffect(() => {
@@ -118,7 +135,7 @@ function NewSessionInner() {
     try {
       const res = await fetch("/api/runs", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode, companyId, participants: selected }),
+        body: JSON.stringify({ mode, companyId, participants: selected, parentRunId: from ?? undefined }),
       });
       const d = await res.json();
       if (!res.ok) throw new Error(typeof d.error === "string" ? d.error : "Failed to create");
@@ -142,6 +159,12 @@ function NewSessionInner() {
       <div className="mx-auto flex max-w-5xl flex-col gap-8 px-6 py-8">
         <h1 className="text-center"><Pixel className="text-xl sm:text-2xl">New Session: {MODE_LABEL[mode]}</Pixel></h1>
 
+        {from && (
+          <p className="rounded-lg bg-brand-tint px-4 py-2 text-center text-sm text-brand">
+            Continuing from a previous {MODE_LABEL[mode]} session — update the info or panel, then reconvene.
+          </p>
+        )}
+
         {/* Company */}
         {companies.length === 0 ? (
           <p className="text-center text-sm text-navy/60">
@@ -149,8 +172,8 @@ function NewSessionInner() {
           </p>
         ) : (
           <section className="flex flex-col gap-3">
-            <select value={companyId} onChange={(e) => selectCompany(e.target.value)}
-              className="max-w-sm rounded-lg border border-navy/15 bg-white p-3 text-sm text-navy outline-none focus:border-brand">
+            <select value={companyId} onChange={(e) => selectCompany(e.target.value)} disabled={!!from}
+              className="max-w-sm rounded-lg border border-navy/15 bg-white p-3 text-sm text-navy outline-none focus:border-brand disabled:opacity-60">
               {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
 
