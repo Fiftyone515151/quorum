@@ -103,6 +103,8 @@ model ModeRun {
   parent      ModeRun?  @relation("RunThread", fields: [parentRunId], references: [id], onDelete: SetNull)
   followups   ModeRun[] @relation("RunThread")
 
+  @@index([threadId])
+
   roles         RunRole[]
   turns         Turn[]
   events        RunEvent[]
