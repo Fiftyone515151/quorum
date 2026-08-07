@@ -17,7 +17,7 @@ import {
   type Dimension,
   type RiskAxis,
 } from "@quorum/engine";
-import { eventsChannel, inboxKey } from "./keys.js";
+import { controlInboxKey, eventsChannel, inboxKey, pauseKey } from "./keys.js";
 
 const REDIS_URL = process.env.REDIS_URL ?? "redis://localhost:6379";
 const queueConn = new Redis(REDIS_URL); // dedicated blocking connection for BRPOP
@@ -93,7 +93,7 @@ async function loadContext(runId: string): Promise<RunContext> {
 async function persist(runId: string, e: RunEvent): Promise<void> {
   if (e.type === "turn.completed") {
     await prisma.turn.create({
-      data: { runId, seq: e.seq, actor: e.actor, segment: e.segment, content: e.content, fields: (e.fields as any) ?? undefined },
+      data: { runId, seq: e.turnOrder ?? e.seq, actor: e.actor, segment: e.segment, content: e.content, fields: (e.fields as any) ?? undefined },
     });
   } else if (e.type === "result") {
     await prisma.modeRun.update({ where: { id: runId }, data: { result: e.payload as any } });
@@ -157,6 +157,23 @@ async function handleRun(runId: string): Promise<void> {
       drainInterjections: async () => {
         const items = await drainListAtomic(cmd, inboxKey(runId));
         return items.map((s) => { try { return JSON.parse(s); } catch { return { content: s }; } });
+      },
+      waitIfPaused: async () => {
+        if (!(await cmd.get(pauseKey(runId)))) return [];
+        await emit({ type: "status", status: "awaiting_founder" });
+        const blocker = new Redis(REDIS_URL);
+        try {
+          const res = await blocker.blpop(controlInboxKey(runId), 0);
+          let message: any = null;
+          try { message = res?.[1] ? JSON.parse(res[1]) : null; } catch { /* ignore malformed control */ }
+          await cmd.del(pauseKey(runId));
+          await emit({ type: "status", status: "running" });
+          return message?.action === "submit" && typeof message.content === "string"
+            ? [{ content: message.content }]
+            : [];
+        } finally {
+          blocker.quit().catch(() => {});
+        }
       },
     });
   } catch (e) {

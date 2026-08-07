@@ -13,8 +13,17 @@ function providerFor(i: number): ProviderName {
 /** §6.4 — the only real multi-round, shared-context discussion. Clues only, never a conclusion. */
 export async function runTea(ctx: RunContext, io: EngineIO): Promise<TeaResult> {
   let seq = 0;
-  const emit = async (actor: string, name: string, segment: string, content: string, avatar?: string) => {
-    await io.emit({ type: "turn.completed", id: randomUUID(), actor, actorName: name, avatar, segment, seq: seq++, content });
+  const startTurn = async (actor: string, actorName: string, segment: string, avatar?: string) => {
+    const turn = { id: randomUUID(), actor, actorName, avatar, segment, turnOrder: seq++ };
+    await io.emit({ type: "turn.start", ...turn, seq: turn.turnOrder });
+    return turn;
+  };
+  const completeTurn = async (turn: Awaited<ReturnType<typeof startTurn>>, content: string) => {
+    await io.emit({ type: "turn.completed", ...turn, seq: turn.turnOrder, turnOrder: turn.turnOrder, content });
+  };
+  const emitInstant = async (actor: string, name: string, segment: string, content: string, avatar?: string) => {
+    const turn = await startTurn(actor, name, segment, avatar);
+    await completeTurn(turn, content);
   };
 
   type T = { name: string; content: string };
@@ -22,29 +31,40 @@ export async function runTea(ctx: RunContext, io: EngineIO): Promise<TeaResult> 
   const count: Record<string, number> = {};
   ctx.panel.forEach((p) => (count[p.id] = 0));
 
+  const receiveFounder = async (segment: string) => {
+    const paused = io.waitIfPaused ? await io.waitIfPaused() : [];
+    for (const message of paused) {
+      transcript.push({ name: "Founder", content: message.content });
+      await emitInstant("founder", "Founder", segment, message.content, "🙋");
+    }
+  };
+
   const opener = ctx.company.topic?.trim()
     ? ctx.company.topic
     : `Let's talk openly about ${ctx.company.name} — no agenda, just interesting angles.`;
   await io.emit({ type: "segment", segment: "S1", label: "S1 · Opening" });
-  await emit("founder", "Founder", "S1", opener, "🙋");
+  await emitInstant("founder", "Founder", "S1", opener, "🙋");
   transcript.push({ name: "Founder", content: opener });
 
   await io.emit({ type: "segment", segment: "S2", label: "S2 · Discussion" });
   const maxTurns = CAPS.tea_max_turns;
 
   for (let turn = 0; turn < maxTurns; turn++) {
+    await receiveFounder("S2");
     // founder interjections (non-blocking)
     if (io.drainInterjections) {
       const pending = await io.drainInterjections();
       for (const m of pending) {
         transcript.push({ name: "Founder", content: m.content });
-        await emit("founder", "Founder", "S2", m.content, "🙋");
+        await emitInstant("founder", "Founder", "S2", m.content, "🙋");
       }
     }
 
     // periodic reframe to avoid circling
     if (turn > 0 && turn % CAPS.tea_round_gap === 0) {
+      let hostTurn: Awaited<ReturnType<typeof startTurn>> | null = null;
       try {
+        hostTurn = await startTurn("host", "Host", "S2", "🎙️");
         const rf = await generateStructured({
           provider: "deepseek",
           system: `You are the host of a founder chat — a catalyst, never a concluder. Toss in ONE fresh angle to reignite the conversation. ${languageDirective(ctx.company)}`,
@@ -52,14 +72,17 @@ export async function runTea(ctx: RunContext, io: EngineIO): Promise<TeaResult> 
           schema: zTeaReframe, maxTokens: 200,
         });
         transcript.push({ name: "Host", content: rf.angle });
-        await emit("host", "Host", "S2", rf.angle, "🎙️");
-      } catch { /* skip */ }
+        await completeTurn(hostTurn, rf.angle);
+      } catch {
+        if (hostTurn) await completeTurn(hostTurn, "Let's keep exploring the thread already on the table.");
+      }
     }
 
     // anti-hog: pick the least-heard persona
     const persona = ctx.panel.slice().sort((a, b) => count[a.id] - count[b.id])[0];
     count[persona.id]++;
     const recent = transcript.slice(-8).map((t) => `${t.name}: ${t.content}`).join("\n");
+    const personaTurn = await startTurn(persona.id, persona.name, "S2", persona.avatar);
     const out = await generateStructured({
       provider: providerFor(ctx.panel.indexOf(persona)),
       system: composeSystemPrompt(persona, "tea", ctx.company),
@@ -67,8 +90,10 @@ export async function runTea(ctx: RunContext, io: EngineIO): Promise<TeaResult> 
       schema: zTeaTurn, maxTokens: 300,
     });
     transcript.push({ name: persona.name, content: out.content });
-    await emit(persona.id, persona.name, "S2", out.content, persona.avatar);
+    await completeTurn(personaTurn, out.content);
   }
+
+  await receiveFounder("S2");
 
   // S3 · extraction (clues only)
   await io.emit({ type: "segment", segment: "S3", label: "S3 · Take-aways (clues, not conclusions)" });

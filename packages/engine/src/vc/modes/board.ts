@@ -45,40 +45,61 @@ export function rankBoardItems(items: Item[], coveredAxes: Set<string>): BoardRe
 /** §6.3 state machine. */
 export async function runBoard(ctx: RunContext, io: EngineIO): Promise<BoardResult> {
   let seq = 0;
-  const emit = async (actor: string, name: string, segment: string, content: string, fields?: unknown, avatar?: string) => {
-    await io.emit({ type: "turn.completed", id: randomUUID(), actor, actorName: name, avatar, segment, seq: seq++, content, fields });
+  const startTurn = async (actor: string, actorName: string, segment: string, avatar?: string) => {
+    const turn = { id: randomUUID(), actor, actorName, avatar, segment, turnOrder: seq++ };
+    await io.emit({ type: "turn.start", ...turn, seq: turn.turnOrder });
+    return turn;
+  };
+  const completeTurn = async (turn: Awaited<ReturnType<typeof startTurn>>, content: string, fields?: unknown) => {
+    await io.emit({ type: "turn.completed", ...turn, seq: turn.turnOrder, turnOrder: turn.turnOrder, content, fields });
+  };
+  const emitInstant = async (actor: string, name: string, segment: string, content: string, fields?: unknown, avatar?: string) => {
+    const turn = await startTurn(actor, name, segment, avatar);
+    await completeTurn(turn, content, fields);
+  };
+  const founderContext: string[] = [];
+  const receiveFounder = async (segment: string) => {
+    const messages = io.waitIfPaused ? await io.waitIfPaused() : [];
+    for (const message of messages) {
+      founderContext.push(message.content);
+      await emitInstant("founder", "Founder", segment, message.content, undefined, "🙋");
+    }
   };
 
-  // S1 · each director proposes items within their own risk axes (parallel)
+  // S1 · each director proposes items within their own risk axes. Board is
+  // intentionally sequential so a founder interjection can shape later turns.
   await io.emit({ type: "segment", segment: "S1", label: "S1 · Director recommendations" });
   const items: Item[] = [];
-  await Promise.all(
-    ctx.panel.map(async (persona, idx) => {
-      if (persona.riskAxes.length === 0) return; // generalist/chair without axes: skip proposing
-      const axesList = persona.riskAxes.map((a) => `${a} (${RISK_AXIS_LABELS[a]})`).join(", ");
-      const out = await generateStructured({
-        provider: providerFor(idx),
-        system: composeSystemPrompt(persona, "board", ctx.company),
-        user: `As a board director, raise concrete improvement items ONLY within your risk axes: ${axesList}.
+  for (let idx = 0; idx < ctx.panel.length; idx++) {
+    const persona = ctx.panel[idx];
+    if (persona.riskAxes.length === 0) continue; // generalist/chair without axes: skip proposing
+    await receiveFounder("S1");
+    const axesList = persona.riskAxes.map((a) => `${a} (${RISK_AXIS_LABELS[a]})`).join(", ");
+    const turn = await startTurn(persona.id, persona.name, "S1", persona.avatar);
+    const out = await generateStructured({
+      provider: providerFor(idx),
+      system: composeSystemPrompt(persona, "board", ctx.company),
+      user: `As a board director, raise concrete improvement items ONLY within your risk axes: ${axesList}.
+${founderContext.length ? `Founder context from this meeting:\n${founderContext.map((x) => `- ${x}`).join("\n")}\n` : ""}
 Output JSON: {"items":[{"suggestion":"concrete action","axis":"<one of: capital|team|market|growth|product>","severity":1-5}]}
 Write prose in the language of the BP.`,
-        schema: zBoardItems,
-      });
-      const mine = out.items
-        .filter((x) => persona.riskAxes.includes(x.axis as RiskAxis))
-        .map((x) => ({ id: randomUUID().slice(0, 8), suggestion: x.suggestion, axis: x.axis, severity: x.severity, director: persona.name }));
-      items.push(...mine);
-      await emit(persona.id, persona.name, "S1", mine.map((m) => `• [${m.axis}] ${m.suggestion} (severity ${m.severity})`).join("\n"), { items: mine }, persona.avatar);
-    })
-  );
+      schema: zBoardItems,
+    });
+    const mine = out.items
+      .filter((x) => persona.riskAxes.includes(x.axis as RiskAxis))
+      .map((x) => ({ id: randomUUID().slice(0, 8), suggestion: x.suggestion, axis: x.axis, severity: x.severity, director: persona.name }));
+    items.push(...mine);
+    await completeTurn(turn, mine.map((m) => `• [${m.axis}] ${m.suggestion} (severity ${m.severity})`).join("\n"), { items: mine });
+  }
 
   // S2 · coverage check (code + host phrasing of gaps)
   await io.emit({ type: "segment", segment: "S2", label: "S2 · Coverage check" });
+  await receiveFounder("S2");
   const coveredAxes = new Set<string>();
   ctx.panel.forEach((p) => p.riskAxes.forEach((a) => coveredAxes.add(a)));
   const gaps = RISK_AXES.filter((a) => !coveredAxes.has(a));
   if (gaps.length) {
-    await emit("host", "Chair", "S2", `Coverage gaps — no director is watching: ${gaps.map((a) => RISK_AXIS_LABELS[a as RiskAxis]).join(", ")}`, { gaps });
+    await emitInstant("host", "Chair", "S2", `Coverage gaps — no director is watching: ${gaps.map((a) => RISK_AXIS_LABELS[a as RiskAxis]).join(", ")}`, { gaps }, "🎙️");
   }
 
   // S3 · founder responds to each item (UI, blocking) — the core of board's priority logic
@@ -93,18 +114,19 @@ Write prose in the language of the BP.`,
       const r = map[it.id];
       if (r) { it.founder_status = r.status; it.note = r.note; }
     }
-    await emit("founder", "Founder", "S3", `Responded to ${Object.keys(map).length} items.`, { responses: resp?.responses });
+    await emitInstant("founder", "Founder", "S3", `Responded to ${Object.keys(map).length} items.`, { responses: resp?.responses }, "🙋");
   }
 
   // S5 · dedup/cluster (host) then rank (code). (S4 severity re-estimate folded in via founder multiplier.)
   await io.emit({ type: "segment", segment: "S5", label: "S5 · Prioritized action list" });
+  await receiveFounder("S5");
   let finalItems = items;
   if (items.length > 3) {
     try {
       const clustered = await generateStructured({
         provider: "deepseek",
         system: `You merge near-duplicate board recommendations that share the same risk axis. Keep the higher severity. ${languageDirective(ctx.company)}`,
-        user: `Items:\n${items.map((it) => `[${it.id}] axis=${it.axis} sev=${it.severity} founder=${it.founder_status ?? "n/a"}: ${it.suggestion}`).join("\n")}\nOutput JSON: {"clusters":[{"merged_suggestion":"...","axis":"...","severity":1-5,"source_ids":["id1","id2"]}]}`,
+        user: `Items:\n${items.map((it) => `[${it.id}] axis=${it.axis} sev=${it.severity} founder=${it.founder_status ?? "n/a"}: ${it.suggestion}`).join("\n")}${founderContext.length ? `\nFounder context:\n${founderContext.map((x) => `- ${x}`).join("\n")}` : ""}\nOutput JSON: {"clusters":[{"merged_suggestion":"...","axis":"...","severity":1-5,"source_ids":["id1","id2"]}]}`,
         schema: zBoardClusters, maxTokens: 900,
       });
       if (clustered.clusters.length) {
