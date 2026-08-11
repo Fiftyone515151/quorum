@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { signToken, setSessionCookie } from "@/lib/auth";
+import { getSession, signToken, setSessionCookie } from "@/lib/auth";
 import { provisionDemoUser, DEMO_LOGINS_PER_IP_PER_DAY } from "@/lib/demo";
+import { isUnlimitedTester } from "@/lib/testAccounts";
 import { redis } from "@/lib/redis";
 
 export const dynamic = "force-dynamic";
@@ -9,9 +10,13 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.ip || "unknown";
 
+  // Developers testing the demo: signed in as an unlimited tester → no IP cap.
+  const current = await getSession();
+  const bypass = isUnlimitedTester(current?.email);
+
   // Per-IP daily cap on demo accounts. Redis being down shouldn't take the
   // demo with it (runs are capped per account anyway), so fail open.
-  try {
+  if (!bypass) try {
     const key = `quorum:demo:logins:${ip}:${new Date().toISOString().slice(0, 10)}`;
     const n = await redis.incr(key);
     if (n === 1) await redis.expire(key, 60 * 60 * 24);
