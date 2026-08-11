@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@quorum/db";
 import { getSession } from "@/lib/auth";
+import { isDemoUser, DEMO_READONLY_ERROR } from "@/lib/demo";
 import { buildCompanyData, companyInputSchema, hasCompanySubstance, extOf } from "@/lib/companyWrite";
 import { rebuildCorpus, sha256 } from "@/lib/corpus";
 
@@ -19,6 +20,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const s = await getSession();
   if (!s) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (isDemoUser(s.email)) return NextResponse.json({ error: DEMO_READONLY_ERROR }, { status: 403 });
   const parsed = companyInputSchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   if (!parsed.data.name?.trim()) return NextResponse.json({ error: "Startup name is required." }, { status: 400 });

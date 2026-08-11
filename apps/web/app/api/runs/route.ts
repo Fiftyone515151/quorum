@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma, Mode } from "@quorum/db";
 import { MIN_PANELISTS, MAX_PANELISTS, findDuplicates } from "@quorum/engine";
 import { getSession } from "@/lib/auth";
+import { isDemoUser, DEMO_MAX_RUNS } from "@/lib/demo";
 import { summarize } from "@/lib/runSummary";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +31,17 @@ export async function POST(req: NextRequest) {
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   const b = parsed.data;
+
+  // Landing-page demo accounts run real LLM sessions on our dime: IC only,
+  // and a hard cap per throwaway account (counting soft-deleted runs too, so
+  // delete-and-retry doesn't reset the meter).
+  if (isDemoUser(s.email)) {
+    if (b.mode !== "ic")
+      return NextResponse.json({ error: "The demo is limited to Investment Committee — sign up (free) to try every mode." }, { status: 403 });
+    const used = await prisma.modeRun.count({ where: { company: { ownerId: s.userId } } });
+    if (used >= DEMO_MAX_RUNS)
+      return NextResponse.json({ error: `Demo limit reached (${DEMO_MAX_RUNS} sessions) — sign up (free) to keep going.` }, { status: 429 });
+  }
 
   const company = await prisma.company.findUnique({
     where: { id: b.companyId },

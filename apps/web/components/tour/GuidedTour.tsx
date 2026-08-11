@@ -3,13 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 
-// ── First-run guided tour ────────────────────────────────────────────────────
-// A lightweight spotlight walkthrough shown once, right after a user finishes
-// onboarding. Progress lives in localStorage so it survives the multi-page
-// journey (home → profile → home → new session → live session → home). Pages
-// opt elements in with `data-tour="…"` attributes; this overlay finds them,
-// dims everything else, and either waits for a "Next" click or for the user
-// to click through to the next page.
+// ── Guided tours ─────────────────────────────────────────────────────────────
+// A lightweight spotlight walkthrough. Two flows share the engine: "main"
+// (first run after onboarding, the full product loop) and "demo" (the public
+// landing-page demo — quick homepage orientation, then a real IC session).
+// Progress lives in localStorage as "<flow>:<stepId>" so it survives the
+// multi-page journey. Pages opt elements in with `data-tour="…"` attributes;
+// this overlay finds them, dims everything else, and either waits for a
+// "Next" click or for the user to click through to the next page.
 
 const KEY = "quorum_tour";
 
@@ -29,7 +30,7 @@ const profile = (p: string) => p.startsWith("/profile");
 const newSession = (p: string) => p.startsWith("/new");
 const session = (p: string) => p.startsWith("/session/");
 
-const STEPS: TourStep[] = [
+const MAIN_STEPS: TourStep[] = [
   {
     id: "profile-panel", match: home, target: "profile-panel",
     title: "Your Startup Profile",
@@ -107,9 +108,70 @@ const STEPS: TourStep[] = [
   },
 ];
 
-/** Arm the tour so it starts on the next page load (call before router.push("/")). */
+// The landing-page demo flow: orient on the home page fast, then run a real
+// Investment Committee session on the pre-loaded demo startup (Relay).
+const DEMO_STEPS: TourStep[] = [
+  {
+    id: "demo-welcome", match: home, target: "profile-panel",
+    title: "Welcome to the demo! 👋",
+    body: "You're signed in as the founder of Relay, an AI customer-support startup we prepared for you. This panel is the startup profile — everything the investor panel reads lives here.",
+  },
+  {
+    id: "demo-modes", match: home, target: "modes",
+    title: "Four kinds of meetings",
+    body: "🎯 Screening — fast triage. ⚖️ Investment Committee — an adversarial invest / pass verdict. 🛠️ Board — post-investment priorities. 🍵 Founder Tea — open discussion.",
+  },
+  {
+    id: "demo-history", match: home, target: "history",
+    title: "Meeting history",
+    body: "Every meeting you run is saved here, ready to revisit.",
+  },
+  {
+    id: "demo-go-ic", match: home, target: "mode-ic", clickThrough: true,
+    title: "Let's run one for real",
+    body: "Click Investment Committee — you're about to convene a live AI panel on Relay.",
+  },
+  {
+    id: "demo-personas", match: newSession, target: "new-personas",
+    title: "Pick your investors",
+    body: "Choose any 4–6 investors — your picks are real and shape the debate. Mix seats from the Persona Library with the Star Investors.",
+  },
+  {
+    id: "demo-start", match: newSession, target: "new-start", clickThrough: true,
+    title: "Convene the panel",
+    body: "Ready? Click below and watch a real session unfold live — the debate takes a few minutes.",
+  },
+  {
+    id: "demo-session-end", match: session, target: "session-end", clickThrough: true,
+    title: "Meeting adjourned",
+    body: "That verdict was generated live. “Discuss again” reconvenes the panel building on this round — or click “Save & back to home” to wrap up.",
+  },
+  {
+    id: "demo-finish", match: home, target: "history",
+    title: "That's Quorum! 🎉",
+    body: "Your session is saved right here. Sign up (free) to pressure-test your own startup with every mode.",
+  },
+];
+
+const FLOWS: Record<string, TourStep[]> = { main: MAIN_STEPS, demo: DEMO_STEPS };
+
+/** Arm the first-run tour so it starts on the next page load (call before router.push("/")). */
 export function startTour() {
-  try { localStorage.setItem(KEY, STEPS[0].id); } catch { /* private mode */ }
+  try { localStorage.setItem(KEY, `main:${MAIN_STEPS[0].id}`); } catch { /* private mode */ }
+}
+
+/** Arm the landing-page demo tour (call before entering the app as a demo user). */
+export function startDemoTour() {
+  try { localStorage.setItem(KEY, `demo:${DEMO_STEPS[0].id}`); } catch { /* private mode */ }
+}
+
+/** Parse a stored "<flow>:<stepId>" value; bare ids are legacy main-flow state. */
+function parseStored(v: string): { flow: string; steps: TourStep[]; idx: number } | null {
+  const [flow, id] = v.includes(":") ? (v.split(":", 2) as [string, string]) : ["main", v];
+  const steps = FLOWS[flow];
+  if (!steps) return null;
+  const idx = steps.findIndex((s) => s.id === id);
+  return idx >= 0 ? { flow, steps, idx } : null;
 }
 
 const PAD = 8;        // spotlight padding around the target
@@ -119,20 +181,23 @@ const GAP = 14;       // spotlight → tooltip gap
 
 interface Box { top: number; left: number; width: number; height: number }
 
+interface Pos { flow: string; idx: number }
+
 export default function GuidedTour() {
   const pathname = usePathname();
-  const [idx, setIdx] = useState<number | null>(null);
+  const [pos, setPos] = useState<Pos | null>(null);
   const [box, setBox] = useState<Box | null>(null);
   const scrolledFor = useRef<string | null>(null);
 
-  const setStep = useCallback((i: number | null) => {
+  const setStep = useCallback((flow: string, i: number | null) => {
     setBox(null);
-    if (i === null || i >= STEPS.length) {
-      setIdx(null);
+    const steps = FLOWS[flow];
+    if (i === null || !steps || i >= steps.length) {
+      setPos(null);
       try { localStorage.removeItem(KEY); } catch { /* ignore */ }
     } else {
-      setIdx(i);
-      try { localStorage.setItem(KEY, STEPS[i].id); } catch { /* ignore */ }
+      setPos({ flow, idx: i });
+      try { localStorage.setItem(KEY, `${flow}:${steps[i].id}`); } catch { /* ignore */ }
     }
   }, []);
 
@@ -142,18 +207,18 @@ export default function GuidedTour() {
   useEffect(() => {
     let saved: string | null = null;
     try { saved = localStorage.getItem(KEY); } catch { /* ignore */ }
-    const i = saved ? STEPS.findIndex((s) => s.id === saved) : -1;
-    if (i < 0) { setIdx(null); return; }
-    if (!STEPS[i].match(pathname) && STEPS[i + 1]?.match(pathname)) setStep(i + 1);
-    else setIdx(i);
+    const p = saved ? parseStored(saved) : null;
+    if (!p) { setPos(null); return; }
+    if (!p.steps[p.idx].match(pathname) && p.steps[p.idx + 1]?.match(pathname)) setStep(p.flow, p.idx + 1);
+    else setPos({ flow: p.flow, idx: p.idx });
   }, [pathname, setStep]);
 
   // Track the target's viewport box. Polling keeps the spotlight glued through
   // scrolling, layout shifts, and late-appearing targets (the session-end block
   // only renders once the run finishes).
   useEffect(() => {
-    if (idx === null) return;
-    const step = STEPS[idx];
+    if (pos === null) return;
+    const step = FLOWS[pos.flow][pos.idx];
     if (!step.match(pathname)) { setBox(null); return; }
 
     const measure = () => {
@@ -174,10 +239,11 @@ export default function GuidedTour() {
     const timer = setInterval(measure, 150);
     window.addEventListener("resize", measure);
     return () => { clearInterval(timer); window.removeEventListener("resize", measure); };
-  }, [idx, pathname]);
+  }, [pos, pathname]);
 
-  if (idx === null || !box) return null;
-  const step = STEPS[idx];
+  if (pos === null || !box) return null;
+  const steps = FLOWS[pos.flow];
+  const step = steps[pos.idx];
 
   const spot: React.CSSProperties = {
     top: box.top - PAD,
@@ -206,20 +272,20 @@ export default function GuidedTour() {
       <div className="pointer-events-none fixed z-[70] animate-pulse rounded-xl ring-4 ring-brand" style={spot} />
 
       <div className="fixed z-[80] w-80 rounded-2xl border-2 border-brand bg-white p-5 shadow-2xl" style={card}>
-        <p className="font-pixel text-[9px] leading-[1.7] text-brand">Tour · {idx + 1} / {STEPS.length}</p>
+        <p className="font-pixel text-[9px] leading-[1.7] text-brand">Tour · {pos.idx + 1} / {steps.length}</p>
         <p className="mt-2 text-base font-bold text-navy">{step.title}</p>
         <p className="mt-1.5 text-sm leading-relaxed text-navy/75">{step.body}</p>
         {step.clickThrough && (
           <p className="mt-3 text-xs font-semibold text-brand">👆 Click the highlighted button to continue</p>
         )}
         <div className="mt-4 flex items-center justify-between">
-          <button onClick={() => setStep(null)} className="text-xs font-medium text-navy/40 underline underline-offset-2 transition hover:text-navy/70">
+          <button onClick={() => setStep(pos.flow, null)} className="text-xs font-medium text-navy/40 underline underline-offset-2 transition hover:text-navy/70">
             Skip tour
           </button>
           {!step.clickThrough && (
-            <button onClick={() => setStep(idx + 1)}
+            <button onClick={() => setStep(pos.flow, pos.idx + 1)}
               className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark">
-              {idx === STEPS.length - 1 ? "Finish" : "Next"}
+              {pos.idx === steps.length - 1 ? "Finish" : "Next"}
             </button>
           )}
         </div>
