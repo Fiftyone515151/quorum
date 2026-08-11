@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession, signToken, setSessionCookie } from "@/lib/auth";
-import { provisionDemoUser, DEMO_LOGINS_PER_IP_PER_DAY } from "@/lib/demo";
+import { provisionDemoUser, DEMO_LOGINS_PER_IP_PER_DAY, DEMO_LIMITS_DISABLED } from "@/lib/demo";
 import { isUnlimitedTester } from "@/lib/testAccounts";
 import { redis } from "@/lib/redis";
 
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
 
   // Per-IP daily cap on demo accounts. Redis being down shouldn't take the
   // demo with it (runs are capped per account anyway), so fail open.
-  if (!bypass) try {
+  if (!bypass && !DEMO_LIMITS_DISABLED) try {
     const key = `quorum:demo:logins:${ip}:${new Date().toISOString().slice(0, 10)}`;
     const n = await redis.incr(key);
     if (n === 1) await redis.expire(key, 60 * 60 * 24);

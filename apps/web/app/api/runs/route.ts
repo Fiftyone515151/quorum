@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma, Mode } from "@quorum/db";
 import { MIN_PANELISTS, MAX_PANELISTS, findDuplicates } from "@quorum/engine";
 import { getSession } from "@/lib/auth";
-import { isDemoUser, DEMO_MAX_RUNS } from "@/lib/demo";
+import { isDemoUser, DEMO_MAX_RUNS, DEMO_LIMITS_DISABLED } from "@/lib/demo";
 import { summarize } from "@/lib/runSummary";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
   // Landing-page demo accounts run real LLM sessions on our dime: IC only,
   // and a hard cap per throwaway account (counting soft-deleted runs too, so
   // delete-and-retry doesn't reset the meter).
-  if (isDemoUser(s.email)) {
+  if (isDemoUser(s.email) && !DEMO_LIMITS_DISABLED) {
     if (b.mode !== "ic")
       return NextResponse.json({ error: "The demo is limited to Investment Committee — sign up (free) to try every mode." }, { status: 403 });
     const used = await prisma.modeRun.count({ where: { company: { ownerId: s.userId } } });
