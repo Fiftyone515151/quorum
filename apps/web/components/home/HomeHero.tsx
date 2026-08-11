@@ -140,7 +140,7 @@ export default function HomeHero({
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {MODES.map((m) => (
-              <button key={m.id} onClick={() => go(`/new?mode=${m.id}`)}
+              <button key={m.id} data-tour={`mode-${m.id}`} onClick={() => go(`/new?mode=${m.id}`)}
                 className="flex flex-col gap-2 rounded-xl bg-brand px-5 py-6 text-left text-white transition hover:bg-brand-dark">
                 <div className="flex items-center gap-2">
                   <span className="text-lg">{m.emoji}</span>
@@ -153,21 +153,23 @@ export default function HomeHero({
 
           <div className="border-t border-navy/10" />
 
-          <div className="flex flex-col gap-1">
-            <Pixel className="text-lg sm:text-xl">History Meetings</Pixel>
-            <p className="text-xs text-navy/40">Deleted meetings can be restored from Settings, kept for up to 30 days.</p>
-          </div>
-
-          {list.length === 0 ? (
-            <p className="text-sm text-navy/50">No meetings yet — start one above.</p>
-          ) : (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {list.map((m) => (
-                <MeetingCard key={m.id} m={m} onOpen={() => router.push(`/session/${m.id}`)}
-                  onDelete={() => setDeleteTarget(m)} onArrow={() => router.push("/history")} />
-              ))}
+          <div data-tour="history" className="flex flex-col gap-6">
+            <div className="flex flex-col gap-1">
+              <Pixel className="text-lg sm:text-xl">History Meetings</Pixel>
+              <p className="text-xs text-navy/40">Deleted meetings can be restored from Settings, kept for up to 30 days.</p>
             </div>
-          )}
+
+            {list.length === 0 ? (
+              <p className="text-sm text-navy/50">No meetings yet — start one above.</p>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {list.map((m) => (
+                  <MeetingCard key={m.id} m={m} onOpen={() => router.push(`/session/${m.id}`)}
+                    onDelete={() => setDeleteTarget(m)} onArrow={() => router.push("/history")} />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Right 1/3 */}
@@ -179,7 +181,7 @@ export default function HomeHero({
             <span className="text-xl">↓</span>
           </div>
           <div className="relative">
-          <div className="flex flex-col gap-4 rounded-2xl border border-navy/10 p-5">
+          <div data-tour="profile-panel" className="flex flex-col gap-4 rounded-2xl border border-navy/10 p-5">
             <div className="flex items-center gap-2">
               <Pixel className="text-base sm:text-lg">Startup Profile</Pixel>
               <div className="group relative ml-auto">
@@ -229,7 +231,7 @@ export default function HomeHero({
               Document library
             </button>
 
-            <button onClick={() => go("/profile")} className="text-center text-sm font-medium text-brand underline underline-offset-2 hover:text-brand-dark">
+            <button data-tour="profile-edit-link" onClick={() => go("/profile")} className="text-center text-sm font-medium text-brand underline underline-offset-2 hover:text-brand-dark">
               View or edit more startup details
             </button>
           </div>

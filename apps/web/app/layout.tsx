@@ -1,6 +1,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import { Inter, Press_Start_2P } from "next/font/google";
+import GuidedTour from "@/components/tour/GuidedTour";
 
 const sans = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
 const pixel = Press_Start_2P({ subsets: ["latin"], weight: "400", variable: "--font-pixel", display: "swap" });
@@ -16,7 +17,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${sans.variable} ${pixel.variable}`}>
-      <body>{children}</body>
+      <body>
+        {children}
+        <GuidedTour />
+      </body>
     </html>
   );
 }

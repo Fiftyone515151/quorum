@@ -516,7 +516,7 @@ export default function SessionClient({ id }: { id: string }) {
         )}
 
         {(status === "done" || status === "failed") && run && (
-          <div className="flex flex-col gap-4 border-t border-navy/10 pt-5">
+          <div data-tour="session-end" className="flex flex-col gap-4 border-t border-navy/10 pt-5">
             {/* Not satisfied? Reconvene, building on this round. */}
             <button
               onClick={() => router.push(`/new?mode=${run.mode}&from=${id}`)}
