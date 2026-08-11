@@ -48,9 +48,15 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-white font-sans text-navy">
-      <div className="px-6 py-4">
+      <div className="flex items-center px-6 py-4">
         <Link href="/">
           <img src="/brand/lockup.png" alt="Quorum" className="h-8 w-auto" />
+        </Link>
+        <Link
+          href="/"
+          className="ml-auto rounded-lg border border-brand px-4 py-2 text-sm font-semibold text-brand transition hover:bg-brand hover:text-white"
+        >
+          ← Back to home
         </Link>
       </div>
 
