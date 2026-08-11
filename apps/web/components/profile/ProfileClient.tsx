@@ -101,7 +101,7 @@ export default function ProfileClient({
     <div className="flex min-h-screen bg-white font-sans text-navy">
       {/* Sidebar */}
       <aside className="flex w-60 shrink-0 flex-col gap-2 border-r border-navy/10 p-4">
-        <button onClick={() => guard(() => router.push(backHref))} className="mb-2 self-start text-sm font-medium text-navy/60 transition hover:text-brand">
+        <button data-tour="profile-back" onClick={() => guard(() => router.push(backHref))} className="mb-2 self-start text-sm font-medium text-navy/60 transition hover:text-brand">
           {backLabel}
         </button>
         <button
@@ -224,7 +224,7 @@ function ProfileView({
     <div className="flex flex-col gap-6">
       <h1><Pixel className="text-lg sm:text-xl">Startup Profile</Pixel></h1>
 
-      <div className="flex flex-col divide-y divide-navy/10 rounded-2xl border border-navy/10">
+      <div data-tour="profile-fields" className="flex flex-col divide-y divide-navy/10 rounded-2xl border border-navy/10">
         {FIELDS.map((f) => {
           const id = fieldId(f);
           const isOpen = open.has(id);
@@ -266,7 +266,7 @@ function ProfileView({
 
       {/* Save (left) / Delete (right), aligned with the box edges */}
       <div className="flex items-center justify-between">
-        <button onClick={save} disabled={busy || !dirty}
+        <button data-tour="profile-save" onClick={save} disabled={busy || !dirty}
           className="rounded-lg bg-brand px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark disabled:opacity-40">
           {busy ? "Saving…" : "Save"}
         </button>

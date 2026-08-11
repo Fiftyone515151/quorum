@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PROFILE_QUESTIONS, type ProfileKey } from "@/lib/profile";
+import { startTour } from "@/components/tour/GuidedTour";
 
 // ── Conversation script ───────────────────────────────────────────────────
 type StepType = "text" | "stage" | "files" | "choice";
@@ -223,6 +224,8 @@ export default function OnboardingChat({ adding }: { adding: boolean }) {
       if (!res.ok) throw new Error(typeof d.error === "string" ? d.error : "Could not save your startup.");
       setDone(true);
       pushBot(["All set — your startup is ready. Taking you in…"]);
+      // First-time setup only: arm the guided tour that starts on the home page.
+      if (!adding) startTour();
       router.push("/");
       router.refresh();
     } catch (e: any) {

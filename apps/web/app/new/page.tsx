@@ -171,7 +171,7 @@ function NewSessionInner() {
             No startup yet — <Link href="/onboarding?add=1" className="text-brand underline">add one first</Link>.
           </p>
         ) : (
-          <section className="flex flex-col gap-3">
+          <section data-tour="new-profile" className="flex flex-col gap-3">
             <select value={companyId} onChange={(e) => selectCompany(e.target.value)} disabled={!!from}
               className="max-w-sm rounded-lg border border-navy/15 bg-white p-3 text-sm text-navy outline-none focus:border-brand disabled:opacity-60">
               {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -196,7 +196,7 @@ function NewSessionInner() {
 
         {/* Panel selection */}
         {pool && companies.length > 0 && (
-          <section className="flex flex-col gap-5">
+          <section data-tour="new-personas" className="flex flex-col gap-5">
             <Pixel className="text-sm sm:text-base">Pick {MIN_PANELISTS}–{MAX_PANELISTS} investors from the Persona Library and Star Investors below.</Pixel>
 
             <div className="flex flex-col gap-2">
@@ -222,7 +222,7 @@ function NewSessionInner() {
           <section className="flex flex-col items-center gap-3">
             <Pixel className="text-sm sm:text-base">Happy with your picks? Start below!</Pixel>
             {notice && <p className="text-sm font-medium text-brand-dark">{notice}</p>}
-            <button onClick={convene} disabled={busy}
+            <button data-tour="new-start" onClick={convene} disabled={busy}
               className="rounded-lg bg-brand px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-dark disabled:opacity-50">
               {busy ? "Convening…" : "Convene the panel"}
             </button>
