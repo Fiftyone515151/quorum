@@ -68,9 +68,14 @@ export default function Landing() {
 
         {/* CTA under the boxes */}
         <div className="flex flex-col items-center gap-3">
-          <Link href="/login" className="rounded-lg bg-brand px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-dark">
-            Sign in to get started
-          </Link>
+          <div className="flex flex-col items-center gap-3 sm:flex-row">
+            <Link href="/login" className="rounded-lg bg-brand px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-dark">
+              Sign in to get started
+            </Link>
+            <Link href="/demo" className="rounded-lg border-2 border-brand px-6 py-[10px] text-sm font-semibold text-brand transition hover:bg-brand hover:text-white">
+              Try a live demo →
+            </Link>
+          </div>
           <a href="#features" className="group inline-flex items-center gap-1 text-sm font-semibold text-brand hover:text-brand-dark">
             See the full features
             <span className="transition group-hover:translate-x-0.5 group-hover:translate-y-0.5">↘</span>

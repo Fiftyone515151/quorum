@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@quorum/db";
 import { getSession } from "@/lib/auth";
+import { isDemoUser, DEMO_READONLY_ERROR } from "@/lib/demo";
 import { extractFileText } from "@/lib/extractText";
 import { rebuildCorpus, sha256 } from "@/lib/corpus";
 
@@ -32,6 +33,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const s = await getSession();
   if (!s) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (isDemoUser(s.email)) return NextResponse.json({ error: DEMO_READONLY_ERROR }, { status: 403 });
 
   const form = await req.formData();
   const file = form.get("file");

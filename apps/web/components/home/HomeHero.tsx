@@ -138,7 +138,7 @@ export default function HomeHero({
             <span className="text-xl text-brand">↓</span>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div data-tour="modes" className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {MODES.map((m) => (
               <button key={m.id} data-tour={`mode-${m.id}`} onClick={() => go(`/new?mode=${m.id}`)}
                 className="flex flex-col gap-2 rounded-xl bg-brand px-5 py-6 text-left text-white transition hover:bg-brand-dark">

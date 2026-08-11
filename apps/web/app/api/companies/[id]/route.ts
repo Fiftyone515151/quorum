@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@quorum/db";
 import { getSession } from "@/lib/auth";
+import { isDemoUser, DEMO_READONLY_ERROR } from "@/lib/demo";
 import { buildCompanyData, companyInputSchema } from "@/lib/companyWrite";
 import { rebuildCorpus } from "@/lib/corpus";
 
@@ -22,6 +23,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const s = await getSession();
   if (!s) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (isDemoUser(s.email)) return NextResponse.json({ error: DEMO_READONLY_ERROR }, { status: 403 });
   const current = await owned(params.id, s.userId);
   if (!current) return NextResponse.json({ error: "not found" }, { status: 404 });
   const parsed = companyInputSchema.safeParse(await req.json());
@@ -37,6 +39,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
   const s = await getSession();
   if (!s) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (isDemoUser(s.email)) return NextResponse.json({ error: DEMO_READONLY_ERROR }, { status: 403 });
   if (!(await owned(params.id, s.userId))) return NextResponse.json({ error: "not found" }, { status: 404 });
   await prisma.company.delete({ where: { id: params.id } });
   return NextResponse.json({ ok: true });
