@@ -516,9 +516,10 @@ export default function SessionClient({ id }: { id: string }) {
         )}
 
         {(status === "done" || status === "failed") && run && (
-          <div data-tour="session-end" className="flex flex-col gap-4 border-t border-navy/10 pt-5">
+          <div className="flex flex-col gap-4 border-t border-navy/10 pt-5">
             {/* Not satisfied? Reconvene, building on this round. */}
             <button
+              data-tour="session-restart"
               onClick={() => router.push(`/new?mode=${run.mode}&from=${id}`)}
               className="self-start rounded-lg border-2 border-brand px-5 py-2.5 text-sm font-semibold text-brand transition hover:bg-brand hover:text-white"
             >
@@ -527,7 +528,7 @@ export default function SessionClient({ id }: { id: string }) {
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-xs font-semibold text-emerald-600">✓ Result saved</span>
               <button onClick={deleteRun} className="ml-auto rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50">Delete session</button>
-              <Link href="/" className="rounded-lg bg-brand px-5 py-2 text-sm font-semibold text-white hover:bg-brand-dark">Save &amp; back to home</Link>
+              <Link data-tour="session-save-exit" href="/" className="rounded-lg bg-brand px-5 py-2 text-sm font-semibold text-white hover:bg-brand-dark">Save &amp; back to home</Link>
             </div>
           </div>
         )}

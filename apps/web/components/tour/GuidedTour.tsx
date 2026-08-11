@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 // ── Guided tours ─────────────────────────────────────────────────────────────
 // A lightweight spotlight walkthrough. Two flows share the engine: "main"
@@ -13,16 +13,20 @@ import { usePathname } from "next/navigation";
 // "Next" click or for the user to click through to the next page.
 
 const KEY = "quorum_tour";
+// The demo run the visitor just watched, so the wrap-up dialog can link back to it.
+const RUN_KEY = "quorum_tour_run";
 
 interface TourStep {
   id: string;
   match: (path: string) => boolean;
-  target: string; // data-tour value
+  target: string; // data-tour value ("" for modal steps)
   title: string;
   body: string;
   /** true → no Next button; the step completes when the user clicks the
    *  highlighted control and navigation lands on the next step's page. */
   clickThrough?: boolean;
+  /** true → centered dialog instead of a spotlight (demo wrap-up). */
+  modal?: boolean;
 }
 
 const home = (p: string) => p === "/";
@@ -97,9 +101,14 @@ const MAIN_STEPS: TourStep[] = [
     body: "Happy with your picks? Start the meeting and watch the discussion unfold — see you at the end!",
   },
   {
-    id: "session-end", match: session, target: "session-end", clickThrough: true,
+    id: "session-review", match: session, target: "session-restart",
     title: "Meeting adjourned",
-    body: "Not satisfied? “Discuss again” reconvenes the panel, building on this round. Your result is already saved — click “Save & back to home” to wrap up.",
+    body: "Take your time with the verdict above. Not satisfied with how it went? This button reconvenes the panel for another round, building on this one.",
+  },
+  {
+    id: "session-save", match: session, target: "session-save-exit", clickThrough: true,
+    title: "Save & head home",
+    body: "Done reviewing? Your result is already saved — click here to head back home.",
   },
   {
     id: "history", match: home, target: "history",
@@ -142,14 +151,19 @@ const DEMO_STEPS: TourStep[] = [
     body: "Ready? Click below and watch a real session unfold live — the debate takes a few minutes.",
   },
   {
-    id: "demo-session-end", match: session, target: "session-end", clickThrough: true,
+    id: "demo-review", match: session, target: "session-restart",
     title: "Meeting adjourned",
-    body: "That verdict was generated live. “Discuss again” reconvenes the panel building on this round — or click “Save & back to home” to wrap up.",
+    body: "That verdict was generated live — take your time reading it. When you're done: this button reconvenes the panel for another round, building on this one.",
   },
   {
-    id: "demo-finish", match: home, target: "history",
-    title: "That's Quorum! 🎉",
-    body: "Your session is saved right here. Sign up (free) to pressure-test your own startup with every mode.",
+    id: "demo-save", match: session, target: "session-save-exit", clickThrough: true,
+    title: "Save & head home",
+    body: "Your result is saved automatically — click here to head back home.",
+  },
+  {
+    id: "demo-finish", match: home, target: "", modal: true,
+    title: "That's the live demo! 🎉",
+    body: "You just pitched a real AI investor panel on a sample startup. Sign up (free) to pressure-test your own idea with every meeting mode.",
   },
 ];
 
@@ -194,7 +208,7 @@ export default function GuidedTour() {
     const steps = FLOWS[flow];
     if (i === null || !steps || i >= steps.length) {
       setPos(null);
-      try { localStorage.removeItem(KEY); } catch { /* ignore */ }
+      try { localStorage.removeItem(KEY); localStorage.removeItem(RUN_KEY); } catch { /* ignore */ }
     } else {
       setPos({ flow, idx: i });
       try { localStorage.setItem(KEY, `${flow}:${steps[i].id}`); } catch { /* ignore */ }
@@ -209,6 +223,11 @@ export default function GuidedTour() {
     try { saved = localStorage.getItem(KEY); } catch { /* ignore */ }
     const p = saved ? parseStored(saved) : null;
     if (!p) { setPos(null); return; }
+    // Remember which session the demo visitor ran, for the wrap-up dialog.
+    if (p.flow === "demo") {
+      const m = pathname.match(/^\/session\/([^/]+)/);
+      if (m) try { localStorage.setItem(RUN_KEY, m[1]); } catch { /* ignore */ }
+    }
     if (!p.steps[p.idx].match(pathname) && p.steps[p.idx + 1]?.match(pathname)) setStep(p.flow, p.idx + 1);
     else setPos({ flow: p.flow, idx: p.idx });
   }, [pathname, setStep]);
@@ -219,7 +238,7 @@ export default function GuidedTour() {
   useEffect(() => {
     if (pos === null) return;
     const step = FLOWS[pos.flow][pos.idx];
-    if (!step.match(pathname)) { setBox(null); return; }
+    if (step.modal || !step.match(pathname)) { setBox(null); return; }
 
     const measure = () => {
       const el = document.querySelector(`[data-tour="${step.target}"]`);
@@ -241,9 +260,15 @@ export default function GuidedTour() {
     return () => { clearInterval(timer); window.removeEventListener("resize", measure); };
   }, [pos, pathname]);
 
-  if (pos === null || !box) return null;
+  if (pos === null) return null;
   const steps = FLOWS[pos.flow];
   const step = steps[pos.idx];
+
+  if (step.modal) {
+    if (!step.match(pathname)) return null;
+    return <FinishModal title={step.title} body={step.body} onClose={() => setStep(pos.flow, null)} />;
+  }
+  if (!box) return null;
 
   const spot: React.CSSProperties = {
     top: box.top - PAD,
@@ -291,5 +316,47 @@ export default function GuidedTour() {
         </div>
       </div>
     </>
+  );
+}
+
+// Demo wrap-up: a centered dialog back on the home page. Offers a hop back to
+// the session the visitor just ran, or a clean exit (sign out → landing page).
+function FinishModal({ title, body, onClose }: { title: string; body: string; onClose: () => void }) {
+  const router = useRouter();
+  const [runId] = useState<string | null>(() => {
+    try { return localStorage.getItem(RUN_KEY); } catch { return null; }
+  });
+
+  function reviewSession() {
+    const id = runId;
+    onClose(); // clears tour state (incl. the stored run id)
+    if (id) router.push(`/session/${id}`);
+  }
+  async function backToLanding() {
+    onClose();
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    window.location.assign("/"); // full reload so the server renders the signed-out landing
+  }
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-navy/55 px-4">
+      <div className="w-full max-w-md rounded-2xl border-2 border-brand bg-white p-7 shadow-2xl">
+        <p className="text-center font-pixel text-[9px] leading-[1.7] text-brand">LIVE DEMO COMPLETE</p>
+        <p className="mt-3 text-center text-lg font-bold text-navy">{title}</p>
+        <p className="mt-2 text-center text-sm leading-relaxed text-navy/75">{body}</p>
+        <div className="mt-6 flex flex-col gap-3">
+          {runId && (
+            <button onClick={reviewSession}
+              className="rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark">
+              Review my session →
+            </button>
+          )}
+          <button onClick={backToLanding}
+            className="rounded-lg border-2 border-brand px-5 py-2 text-sm font-semibold text-brand transition hover:bg-brand-tint">
+            Back to the landing page
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
