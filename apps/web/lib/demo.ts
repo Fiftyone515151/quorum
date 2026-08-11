@@ -9,6 +9,10 @@ import { rebuildCorpus } from "./corpus";
 
 export const DEMO_EMAIL_DOMAIN = "demo.quorum.local";
 
+/** TEMP (2026-08): all demo limits are off for testing — set back to false to
+ *  restore the per-IP login cap, the per-account run cap, and IC-only mode. */
+export const DEMO_LIMITS_DISABLED = true;
+
 /** Real LLM sessions cost money — cap what one throwaway demo account can run. */
 export const DEMO_MAX_RUNS = 3;
 /** …and how many throwaway accounts one IP can mint per day. */
