@@ -27,6 +27,9 @@ interface TourStep {
   clickThrough?: boolean;
   /** true → centered dialog instead of a spotlight (demo wrap-up). */
   modal?: boolean;
+  /** true → corner notice instead of a spotlight: no dimming, no auto-scroll,
+   *  so the user can read the page freely. Shows once `target` exists. */
+  passive?: boolean;
 }
 
 const home = (p: string) => p === "/";
@@ -101,9 +104,14 @@ const MAIN_STEPS: TourStep[] = [
     body: "Happy with your picks? Start the meeting and watch the discussion unfold — see you at the end!",
   },
   {
-    id: "session-review", match: session, target: "session-restart",
+    id: "session-adjourned", match: session, target: "session-restart", passive: true,
     title: "Meeting adjourned",
-    body: "Take your time with the verdict above. Not satisfied with how it went? This button reconvenes the panel for another round, building on this one.",
+    body: "Scroll back through the discussion and the verdict at your own pace — click Next when you're done.",
+  },
+  {
+    id: "session-review", match: session, target: "session-restart",
+    title: "Not satisfied?",
+    body: "This button reconvenes the panel for another round, building on everything said in this one.",
   },
   {
     id: "session-save", match: session, target: "session-save-exit", clickThrough: true,
@@ -151,9 +159,14 @@ const DEMO_STEPS: TourStep[] = [
     body: "Ready? Click below and watch a real session unfold live — the debate takes a few minutes.",
   },
   {
+    id: "demo-adjourned", match: session, target: "session-restart", passive: true,
+    title: "Meeting adjourned! 🎉",
+    body: "Everything you just watched was generated live. Scroll back through the discussion and the verdict at your own pace — click Next when you're done.",
+  },
+  {
     id: "demo-review", match: session, target: "session-restart",
-    title: "Meeting adjourned",
-    body: "That verdict was generated live — take your time reading it. When you're done: this button reconvenes the panel for another round, building on this one.",
+    title: "Want another round?",
+    body: "This button reconvenes the panel, building on everything said in this one. (The demo allows 3 sessions.)",
   },
   {
     id: "demo-save", match: session, target: "session-save-exit", clickThrough: true,
@@ -243,7 +256,7 @@ export default function GuidedTour() {
     const measure = () => {
       const el = document.querySelector(`[data-tour="${step.target}"]`);
       if (!el) { setBox(null); return; }
-      if (scrolledFor.current !== step.id) {
+      if (!step.passive && scrolledFor.current !== step.id) {
         scrolledFor.current = step.id;
         el.scrollIntoView({ block: "center", behavior: "smooth" });
       }
@@ -269,6 +282,27 @@ export default function GuidedTour() {
     return <FinishModal title={step.title} body={step.body} onClose={() => setStep(pos.flow, null)} />;
   }
   if (!box) return null;
+
+  // Passive notice: a corner card with no dimming — the page stays fully
+  // readable and clickable until the user presses Next.
+  if (step.passive) {
+    return (
+      <div className="fixed bottom-6 right-6 z-[80] w-80 rounded-2xl border-2 border-brand bg-white p-5 shadow-2xl">
+        <p className="font-pixel text-[9px] leading-[1.7] text-brand">Tour · {pos.idx + 1} / {steps.length}</p>
+        <p className="mt-2 text-base font-bold text-navy">{step.title}</p>
+        <p className="mt-1.5 text-sm leading-relaxed text-navy/75">{step.body}</p>
+        <div className="mt-4 flex items-center justify-between">
+          <button onClick={() => setStep(pos.flow, null)} className="text-xs font-medium text-navy/40 underline underline-offset-2 transition hover:text-navy/70">
+            Skip tour
+          </button>
+          <button onClick={() => setStep(pos.flow, pos.idx + 1)}
+            className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark">
+            Next
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const spot: React.CSSProperties = {
     top: box.top - PAD,
@@ -327,10 +361,10 @@ function FinishModal({ title, body, onClose }: { title: string; body: string; on
     try { return localStorage.getItem(RUN_KEY); } catch { return null; }
   });
 
+  // Deliberately does NOT end the tour: the wrap-up dialog reappears every
+  // time the visitor comes back to the home page, until they exit to landing.
   function reviewSession() {
-    const id = runId;
-    onClose(); // clears tour state (incl. the stored run id)
-    if (id) router.push(`/session/${id}`);
+    if (runId) router.push(`/session/${runId}`);
   }
   async function backToLanding() {
     onClose();
